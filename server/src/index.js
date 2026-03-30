@@ -151,9 +151,21 @@ app.use((err, req, res, _next) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`[server] flight-delay-v2 running on port ${config.port} (${config.nodeEnv})`);
-  eventSource.start();
+  eventSource.start().catch(err => {
+    console.error('[server] Failed to start event source:', err.message);
+    process.exit(1);
+  });
+});
+
+// Graceful shutdown — important for Event Hub to commit final checkpoints
+process.on('SIGTERM', async () => {
+  console.log('[server] SIGTERM received — shutting down gracefully');
+  server.close(async () => {
+    await eventSource.stop();
+    process.exit(0);
+  });
 });
 
 module.exports = app;

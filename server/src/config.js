@@ -62,6 +62,14 @@ const config = {
     user: optionalEnv('SMTP_USER', ''),
     pass: optionalEnv('SMTP_PASS', ''),
   },
+
+  // Azure Event Hub — production only (ignored in development)
+  eventHub: {
+    connectionString:        optionalEnv('EVENT_HUB_CONNECTION_STRING', ''),
+    name:                    optionalEnv('EVENT_HUB_NAME', 'oag-flight-alerts'),
+    storageConnectionString: optionalEnv('EVENT_HUB_STORAGE_CONNECTION_STRING', ''),
+    storageContainerName:    optionalEnv('EVENT_HUB_STORAGE_CONTAINER', 'event-hub-checkpoints'),
+  },
 };
 
 module.exports = config;

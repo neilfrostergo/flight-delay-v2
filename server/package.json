@@ -10,6 +10,9 @@
     "seed:demo": "node src/db/seedDemo.js"
   },
   "dependencies": {
+    "@azure/event-hubs": "^6.0.3",
+    "@azure/eventhubs-checkpointstore-blob": "^2.0.0",
+    "@azure/storage-blob": "^12.31.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
     "cors": "^2.8.5",

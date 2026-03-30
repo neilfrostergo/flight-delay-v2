@@ -1,49 +1,15 @@
 'use strict';
 
 /**
- * Event source — POC implementation using a DB poller.
+ * Event source — switches between implementations based on NODE_ENV.
  *
- * Polls flight_events every 30s for unprocessed rows and passes them
- * to delayProcessor. The delayProcessor never changes between POC and prod.
+ * Development:  30s DB poller (no Azure dependencies needed locally)
+ * Production:   Azure Event Hub consumer (eventHubConsumer.js)
  *
- * ── PRODUCTION SWAP ─────────────────────────────────────────────────────────
- * Replace start() with an Azure Event Hub consumer:
- *
- *   const { EventHubConsumerClient } = require('@azure/event-hubs');
- *
- *   async function start() {
- *     const client = new EventHubConsumerClient(
- *       EventHubConsumerClient.defaultConsumerGroupName,
- *       process.env.OAG_EVENT_HUB_CONNECTION_STRING
- *     );
- *     client.subscribe({
- *       processEvents: async (events) => {
- *         for (const e of events) {
- *           const mapped = mapOAGEvent(e.body);
- *           const { rows } = await query(
- *             `INSERT INTO flight_events (subscription_id, state, delay_minutes, raw_payload)
- *              VALUES ($1,$2,$3,$4) RETURNING *`,
- *             [mapped.subscriptionId, mapped.state, mapped.delayMinutes, JSON.stringify(e.body)]
- *           );
- *           await delayProcessor.processEvent(rows[0]);
- *         }
- *       },
- *       processError: async (err) => console.error('[eventSource]', err.message),
- *     });
- *     console.log('[eventSource] Azure Event Hub consumer started');
- *   }
- *
- *   function mapOAGEvent(body) {
- *     const depVariation = body.departure?.outGateVariation || 0;
- *     return {
- *       subscriptionId: lookupSubscriptionId(body), // query DB by carrier+flight+date
- *       state:          body.state,
- *       delayMinutes:   Math.max(0, depVariation),
- *     };
- *   }
- * ─────────────────────────────────────────────────────────────────────────────
+ * delayProcessor.js is never touched — events reach it the same way either side.
  */
 
+const config                          = require('../config');
 const { query }                       = require('../db/connection');
 const delayProcessor                  = require('./delayProcessor');
 const { cleanupExpiredSubscriptions } = require('./oagAlerts');
@@ -54,6 +20,7 @@ const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 let _pollTimer    = null;
 let _cleanupTimer = null;
 
+// ── DEV: 30s DB poller ────────────────────────────────────────────────────────
 async function poll() {
   try {
     const result = await query(
@@ -63,7 +30,6 @@ async function poll() {
        ORDER BY fe.created_at ASC
        LIMIT 50`
     );
-
     for (const row of result.rows) {
       await delayProcessor.processEvent(row);
     }
@@ -72,20 +38,56 @@ async function poll() {
   }
 }
 
-function start() {
+function startPoller() {
   if (_pollTimer) return;
-
-  console.log(`[eventSource] POC poller started — checking every ${POLL_INTERVAL_MS / 1000}s`);
+  console.log(`[eventSource] DEV poller started — checking every ${POLL_INTERVAL_MS / 1000}s`);
   poll();
   _pollTimer    = setInterval(poll, POLL_INTERVAL_MS);
   _cleanupTimer = setInterval(cleanupExpiredSubscriptions, CLEANUP_INTERVAL_MS);
 }
 
-function stop() {
+function stopPoller() {
   clearInterval(_pollTimer);
   clearInterval(_cleanupTimer);
   _pollTimer    = null;
   _cleanupTimer = null;
+}
+
+// ── PRODUCTION: Azure Event Hub ───────────────────────────────────────────────
+async function startEventHub() {
+  const eventHubConsumer = require('./eventHubConsumer');
+  await eventHubConsumer.start({
+    connectionString:    config.eventHub.connectionString,
+    eventHubName:        config.eventHub.name,
+    storageConnectionString: config.eventHub.storageConnectionString,
+    storageContainerName:    config.eventHub.storageContainerName,
+  });
+  // Cleanup still runs hourly in production
+  _cleanupTimer = setInterval(cleanupExpiredSubscriptions, CLEANUP_INTERVAL_MS);
+}
+
+async function stopEventHub() {
+  clearInterval(_cleanupTimer);
+  _cleanupTimer = null;
+  const eventHubConsumer = require('./eventHubConsumer');
+  await eventHubConsumer.stop();
+}
+
+// ── Public interface ──────────────────────────────────────────────────────────
+async function start() {
+  if (config.isProduction) {
+    await startEventHub();
+  } else {
+    startPoller();
+  }
+}
+
+async function stop() {
+  if (config.isProduction) {
+    await stopEventHub();
+  } else {
+    stopPoller();
+  }
 }
 
 module.exports = { start, stop };
