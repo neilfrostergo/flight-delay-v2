@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: flightdelay
+      POSTGRES_USER: flightdelay
+      POSTGRES_PASSWORD: flightdelay
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flightdelay"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: ./server
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://flightdelay:flightdelay@db:5432/flightdelay
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_replace_in_production_64chars_minimum_here_ok}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      PORT: 3000
+      NODE_ENV: ${NODE_ENV:-development}
+      BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+      DEV_TENANT_SLUG: ${DEV_TENANT_SLUG:-demo}
+      ADMIN_CORS_ORIGIN: ${ADMIN_CORS_ORIGIN:-http://localhost:3000}
+      ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:-changeme}
+      SMTP_HOST: ${SMTP_HOST:-sandbox.smtp.mailtrap.io}
+      SMTP_PORT: ${SMTP_PORT:-2525}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./server/src:/app/src
+      - ./customer:/app/public/customer
+      - ./admin:/app/public/admin
+    command: npm run dev
+
+volumes:
+  pgdata:
