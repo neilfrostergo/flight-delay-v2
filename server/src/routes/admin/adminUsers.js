@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const bcrypt  = require('bcrypt');
+const bcrypt  = require('bcryptjs');
 const { query } = require('../../db/connection');
 const { adminTenantScope } = require('../../middleware/requireAdmin');
 

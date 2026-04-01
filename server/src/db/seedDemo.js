@@ -7,7 +7,7 @@
 
 const { query, withTransaction } = require('./connection');
 const { encrypt } = require('../services/encryption');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 async function main() {
   console.log('[seed:demo] Starting demo data seed…');

@@ -2,7 +2,7 @@
 
 require('dotenv').config();
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { pool, query } = require('./connection');
 
 const DEFAULT_USERNAME = 'admin';
