@@ -18,6 +18,7 @@ const requireAdmin = require('./middleware/requireAdmin');
 const tenantConfigRouter = require('./routes/tenantConfig');
 const flightLookupRouter = require('./routes/flightLookup');
 const airportsRouter     = require('./routes/airports');
+const carriersRouter     = require('./routes/carriers');
 const validatePolicyRouter = require('./routes/validatePolicy');
 const validateTokenRouter = require('./routes/validateToken');
 const registerRouter       = require('./routes/register');
@@ -42,6 +43,9 @@ const adminTenantSettingsRouter = require('./routes/admin/tenantSettings');
 const eventSource = require('./services/eventSource');
 
 const app = express();
+
+// Health check — used by Front Door and Container Apps liveness probes
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 // ── Security headers ────────────────────────────────────────────────────────
 app.use(helmet({
@@ -68,6 +72,7 @@ app.use('/api/validate-token', cors());
 app.use('/api/flight-lookup', cors());
 app.use('/api/registrations', cors());
 app.use('/api/airports', cors());
+app.use('/api/carriers', cors());
 app.use('/api/documents', cors());
 app.use('/api/customer', cors());
 
@@ -94,6 +99,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOS
 // ── Public routes ─────────────────────────────────────────────────────────────
 app.use('/api/tenant-config', tenantConfigRouter);
 app.use('/api/airports', airportsRouter);
+app.use('/api/carriers', carriersRouter);
 app.use('/api/flight-lookup', validateLimiter, flightLookupRouter);
 app.use('/api/validate-policy', validateLimiter, validatePolicyRouter);
 app.use('/api/validate-token', validateLimiter, validateTokenRouter);
