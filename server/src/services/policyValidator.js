@@ -10,6 +10,7 @@ const { decrypt } = require('./encryption');
 
 // Known demo policies with realistic data
 const DEMO_POLICIES = {
+  // Annual multi-trip — covers all of 2026
   'POL-001-ACTIVE': {
     firstName: 'Sarah', lastName: 'Johnson',
     policyType: 'annual_multi_trip',
@@ -21,15 +22,17 @@ const DEMO_POLICIES = {
     coverStartDate: '2026-01-01',
     coverEndDate:   '2026-12-31',
   },
-  'POL-002-PAID': {
+  // Single trip — LHR → MAD, two weeks away (relative to 2026-03-31)
+  'POL-002-ACTIVE': {
     firstName: 'James', lastName: 'Williams',
     policyType: 'single_trip',
     travelers: [{ firstName: 'James', lastName: 'Williams' }],
     payoutPence: 25000,
-    coverStartDate: '2026-03-15',
-    coverEndDate:   '2026-03-22',
+    coverStartDate: '2026-04-10',
+    coverEndDate:   '2026-04-17',
   },
-  'POL-003-PENDING': {
+  // Annual multi-trip — family, covers 2026–2027
+  'POL-003-ACTIVE': {
     firstName: 'Emma', lastName: 'Davies',
     policyType: 'annual_multi_trip',
     travelers: [
@@ -41,6 +44,7 @@ const DEMO_POLICIES = {
     coverStartDate: '2026-02-01',
     coverEndDate:   '2027-01-31',
   },
+  // Annual multi-trip — couple, covers 2026–2027
   'POL-004-ACTIVE': {
     firstName: 'Mohammed', lastName: 'Al-Hassan',
     policyType: 'annual_multi_trip',
@@ -51,6 +55,83 @@ const DEMO_POLICIES = {
     payoutPence: 30000,
     coverStartDate: '2026-01-15',
     coverEndDate:   '2027-01-14',
+  },
+  // Single trip — return trip, flying next month
+  'POL-005-ACTIVE': {
+    firstName: 'Charlotte', lastName: 'Baker',
+    policyType: 'return_trip',
+    travelers: [
+      { firstName: 'Charlotte', lastName: 'Baker' },
+      { firstName: 'Daniel',    lastName: 'Baker' },
+    ],
+    payoutPence: 15000,
+    coverStartDate: '2026-05-01',
+    coverEndDate:   '2026-05-14',
+  },
+
+  // ── Ergo demo accounts ────────────────────────────────────────────────────
+  'ERGO-AMT-2026-001': {
+    firstName: 'Thomas', lastName: 'Müller',
+    policyType: 'annual_multi_trip',
+    travelers: [
+      { firstName: 'Thomas', lastName: 'Müller' },
+      { firstName: 'Anna',   lastName: 'Müller' },
+    ],
+    payoutPence: 30000,
+    coverStartDate: '2026-01-01',
+    coverEndDate:   '2026-12-31',
+  },
+  'ERGO-RET-2026-042': {
+    firstName: 'Sophie', lastName: 'Klein',
+    policyType: 'return_trip',
+    travelers: [{ firstName: 'Sophie', lastName: 'Klein' }],
+    payoutPence: 25000,
+    coverStartDate: '2026-05-01',
+    coverEndDate:   '2026-05-21',
+  },
+  'ERGO-SGL-2026-117': {
+    firstName: 'Lukas', lastName: 'Becker',
+    policyType: 'single_trip',
+    travelers: [
+      { firstName: 'Lukas',  lastName: 'Becker' },
+      { firstName: 'Mia',    lastName: 'Becker' },
+      { firstName: 'Noah',   lastName: 'Becker' },
+    ],
+    payoutPence: 20000,
+    coverStartDate: '2026-04-14',
+    coverEndDate:   '2026-04-28',
+  },
+
+  // ── Staysure demo accounts ────────────────────────────────────────────────
+  'SS-AMT-2026-3301': {
+    firstName: 'Patricia', lastName: 'Hughes',
+    policyType: 'annual_multi_trip',
+    travelers: [
+      { firstName: 'Patricia', lastName: 'Hughes' },
+      { firstName: 'Gerald',   lastName: 'Hughes' },
+    ],
+    payoutPence: 25000,
+    coverStartDate: '2026-01-01',
+    coverEndDate:   '2026-12-31',
+  },
+  'SS-RET-2026-8820': {
+    firstName: 'Margaret', lastName: 'Thornton',
+    policyType: 'return_trip',
+    travelers: [
+      { firstName: 'Margaret', lastName: 'Thornton' },
+      { firstName: 'Ronald',   lastName: 'Thornton' },
+    ],
+    payoutPence: 30000,
+    coverStartDate: '2026-06-01',
+    coverEndDate:   '2026-06-15',
+  },
+  'SS-SGL-2026-5504': {
+    firstName: 'Dorothy', lastName: 'Pearson',
+    policyType: 'single_trip',
+    travelers: [{ firstName: 'Dorothy', lastName: 'Pearson' }],
+    payoutPence: 20000,
+    coverStartDate: '2026-04-20',
+    coverEndDate:   '2026-04-27',
   },
 };
 
@@ -93,21 +174,65 @@ function stubValidate(policyNumber, email) {
 // ─────────────────────────────────────────────────────────────────────────────
 // LIVE MODE — Ergo Connect API
 // POST {tenant.policy_api_url}/api/PolicySearch/getpolicy
-// Auth: Bearer <decrypted tenant.policy_api_key_enc>
+// Auth: OAuth2 password flow — POST /token → Bearer token (when policy_api_secret_enc set)
+//       Falls back to X-Api-Key header for tenants without a secret.
 //
 // Production swap point: to integrate a different insurer's API, update only
 // the liveValidate() function below and adjust the field mapping.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Per-tenant token cache: slug → { token, expiresAt }
+const _tokenCache = new Map();
+
+async function getOauth2Token(tenant, username, password) {
+  const cached = _tokenCache.get(tenant.slug);
+  if (cached && Date.now() < cached.expiresAt) return cached.token;
+
+  const baseUrl = tenant.policy_api_url.replace(/\/$/, '').replace(/\/api\/.*$/, '');
+  const tokenUrl = `${baseUrl}/token`;
+
+  const body = new URLSearchParams({
+    grant_type: 'password',
+    username,
+    password,
+    scope: 'api',
+  });
+
+  const res = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+    signal: AbortSignal.timeout(10000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`OAuth2 token request failed: HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const token = data.access_token;
+  const expiresIn = (data.expires_in || 3600) * 1000;
+  _tokenCache.set(tenant.slug, { token, expiresAt: Date.now() + expiresIn - 60000 });
+  return token;
+}
+
 async function liveValidate(tenant, policyNumber, email) {
-  let bearerToken;
+  let authHeader;
   try {
-    bearerToken = decrypt(tenant.policy_api_key_enc);
+    const username = decrypt(tenant.policy_api_key_enc);
+    if (tenant.policy_api_secret_enc) {
+      const password = decrypt(tenant.policy_api_secret_enc);
+      const token = await getOauth2Token(tenant, username, password);
+      authHeader = `Bearer ${token}`;
+    } else {
+      authHeader = `Bearer ${username}`;
+    }
   } catch (err) {
-    console.error('[policyValidator] Failed to decrypt API key for tenant', tenant.slug, err.message);
+    console.error('[policyValidator] Auth setup failed for tenant', tenant.slug, err.message);
     return { valid: false, errorMessage: 'Policy validation service unavailable' };
   }
 
-  const baseUrl = tenant.policy_api_url.replace(/\/$/, '');
+  const baseUrl = tenant.policy_api_url.replace(/\/$/, '').replace(/\/api\/.*$/, '');
   const url = `${baseUrl}/api/PolicySearch/getpolicy`;
 
   let body;
@@ -116,7 +241,7 @@ async function liveValidate(tenant, policyNumber, email) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${bearerToken}`,
+        'Authorization': authHeader,
       },
       body: JSON.stringify({ policyNumber, pageSize: 1 }),
       signal: AbortSignal.timeout(10000),
@@ -170,13 +295,24 @@ async function liveValidate(tenant, policyNumber, email) {
     return { valid: false, errorMessage: 'Benefit limit is zero — policy not eligible' };
   }
 
+  // Derive policy type from the product name
+  const product = (policy.product || '').toLowerCase();
+  let policyType = 'single_trip';
+  if (product.includes('amt') || product.includes('annual') || product.includes('multi')) {
+    policyType = 'annual_multi_trip';
+  } else if (product.includes('return')) {
+    policyType = 'return_trip';
+  }
+
   return {
     valid: true,
-    firstName: policy.policyHolderFirstName || '',
-    lastName: policy.policyHolderLastName || '',
+    firstName:     policy.policyHolderFirstName || '',
+    lastName:      policy.policyHolderLastName  || '',
+    policyType,
+    travelers:     [{ firstName: policy.policyHolderFirstName || '', lastName: policy.policyHolderLastName || '' }],
     payoutPence,
     coverStartDate: policy.startDate || null,
-    coverEndDate: policy.endDate || null,
+    coverEndDate:   policy.endDate   || null,
     rawResponse: body,
   };
 }

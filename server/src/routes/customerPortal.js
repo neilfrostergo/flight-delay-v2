@@ -12,6 +12,7 @@ const { query }       = require('../db/connection');
 const requireCustomer = require('../middleware/requireCustomer');
 const { parseDocument, matchFlights } = require('../services/documentParser');
 const { getOrCreateSubscription }     = require('../services/oagAlerts');
+const { validatePolicy }              = require('../services/policyValidator');
 
 const router = express.Router();
 
@@ -65,8 +66,30 @@ router.post('/sessions', async (req, res) => {
   );
 
   if (result.rows.length === 0) {
-    // Deliberately vague to avoid enumeration
-    return res.status(401).json({ error: 'No registration found — check your policy number and email' });
+    // No registration yet — validate via policy API and issue a policy-only session
+    // so the portal can still display policy info before the customer registers any flights.
+    const policyResult = await validatePolicy(req.tenant, policy_number.trim(), email.trim());
+    if (!policyResult.valid) {
+      return res.status(401).json({ error: 'No registration found — check your policy number and email' });
+    }
+
+    const token = jwt.sign(
+      {
+        sub:              null, // no registration row
+        policy_number:    policy_number.trim().toUpperCase(),
+        first_name:       policyResult.firstName,
+        last_name:        policyResult.lastName,
+        email:            email.trim().toLowerCase(),
+        payout_pence:     policyResult.payoutPence,
+        cover_start_date: policyResult.coverStartDate || null,
+        cover_end_date:   policyResult.coverEndDate   || null,
+        tenant_id:        req.tenant.id,
+        type:             'customer',
+      },
+      config.jwt.secret,
+      { expiresIn: '24h' }
+    );
+    return res.json({ token, registrationId: null });
   }
 
   const registrationId = result.rows[0].id;
@@ -83,6 +106,22 @@ router.post('/sessions', async (req, res) => {
 router.get('/registration', requireCustomer, async (req, res) => {
   if (!req.tenant || req.customer.tenant_id !== req.tenant.id) {
     return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  // Policy-only session — no registration row exists yet
+  if (!req.customer.sub) {
+    return res.json({
+      id:               null,
+      policy_number:    req.customer.policy_number,
+      first_name:       req.customer.first_name,
+      last_name:        req.customer.last_name,
+      email:            req.customer.email,
+      payout_pence:     req.customer.payout_pence,
+      cover_start_date: req.customer.cover_start_date || null,
+      cover_end_date:   req.customer.cover_end_date   || null,
+      status:           'not_registered',
+      flights:          [],
+    });
   }
 
   const regResult = await query(

@@ -266,6 +266,19 @@
         <div class="nav-item" data-page="users" onclick="nav('users')">
           <span class="icon">👤</span> Admin Users
         </div>
+        <div class="nav-section">Tools</div>
+        <div class="nav-item" data-page="registrations" onclick="nav('registrations')">
+          <span class="icon">📝</span> Registrations
+        </div>
+        <div class="nav-item" data-page="flights" onclick="nav('flights')">
+          <span class="icon">✈</span> Flights
+        </div>
+        <div class="nav-item" data-page="payments" onclick="nav('payments')">
+          <span class="icon">💳</span> Payments
+        </div>
+        <div class="nav-item" data-page="simulator" onclick="nav('simulator')">
+          <span class="icon">🧪</span> Simulator
+        </div>
       </div>
 
       <!-- Tenant admin sections -->
@@ -598,6 +611,21 @@
               <input id="st-terms-url" />
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Online Claim URL</label>
+              <input id="st-claim-url" placeholder="https://…/claims" />
+              <small>Link shown in confirmation emails to make a claim online.</small>
+            </div>
+            <div class="form-group">
+              <small style="color:#6b7280;padding-top:24px;display:block;">The <strong>My Account</strong> link in confirmation emails points to this portal automatically (e.g. <em>https://yourslug.platform.co.uk</em>) — no configuration needed.</small>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Register Claim URL</label>
+            <input id="st-register-claim-url" placeholder="https://…/register" />
+            <small>URL for the "Register your claim online" button shown at the bottom of all customer emails. Leave blank to hide the button.</small>
+          </div>
         </div>
 
         <div id="settings-tab-policy-api" class="card" style="display:none">
@@ -605,10 +633,17 @@
             <label>Policy API URL</label>
             <input id="st-policy-url" placeholder="https://ergoconnectwebapi.azurewebsites.net" />
           </div>
-          <div class="form-group">
-            <label>Policy API Key (Bearer Token)</label>
-            <input id="st-policy-key" type="password" placeholder="Leave blank to keep existing" />
-            <small>Stored encrypted. Leave blank to keep existing key.</small>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Policy API Username / Key</label>
+              <input id="st-policy-key" type="password" placeholder="Leave blank to keep existing" />
+              <small>OAuth2 username, or API key. Stored encrypted.</small>
+            </div>
+            <div class="form-group">
+              <label>Policy API Password / Secret</label>
+              <input id="st-policy-secret" type="password" placeholder="Leave blank to keep existing" />
+              <small>OAuth2 password. Leave blank if using a single API key.</small>
+            </div>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -692,6 +727,11 @@
       </div>
     </div>
     <div class="form-group"><label>Terms URL</label><input id="tm-terms-url" placeholder="https://…/terms" /></div>
+    <div class="form-group">
+      <label>Register Claim URL</label>
+      <input id="tm-register-claim-url" placeholder="https://…/register" />
+      <small>URL for the "Register your claim online" button in customer emails. Leave blank to hide.</small>
+    </div>
     <div class="form-group"><label>Policy API URL</label>
       <input id="tm-policy-url" placeholder="https://ergoconnectwebapi.azurewebsites.net" />
     </div>
@@ -717,6 +757,25 @@
     </div>
     <div class="form-group"><label>Modulr Mode</label>
       <select id="tm-modulr-mode"><option value="stub">Stub</option><option value="live">Live</option></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Min Hours Before Departure</label>
+        <input id="tm-min-hours" type="number" min="1" max="168" placeholder="24" />
+        <small>Earliest a customer can register (hours before departure)</small>
+      </div>
+      <div class="form-group">
+        <label>Max Days Before Departure</label>
+        <input id="tm-max-days" type="number" min="1" max="365" placeholder="40" />
+        <small>Furthest in advance a customer can register (days)</small>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Portal Button Label</label>
+        <input id="tm-portal-label" type="text" maxlength="100" placeholder="My Account" />
+        <small>Text shown on the customer portal nav button (default: "My Account")</small>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-tenant')">Cancel</button>
@@ -1008,16 +1067,6 @@ async function initApp() {
   document.getElementById('nav-superadmin').style.display = isSuperadmin ? '' : 'none';
   document.getElementById('nav-tenant').style.display = isSuperadmin ? 'none' : '';
 
-  // Superadmin doesn't have tenant settings/tokens nav
-  if (isSuperadmin) {
-    document.getElementById('nav-tenant').style.display = '';
-    // Hide tenant-specific items for superadmin
-    const tenantOnlyPages = ['tokens', 'settings'];
-    document.querySelectorAll('[data-page]').forEach(el => {
-      if (tenantOnlyPages.includes(el.dataset.page)) el.style.display = isSuperadmin ? 'none' : '';
-    });
-  }
-
   nav('dashboard');
 }
 
@@ -1178,6 +1227,7 @@ function openTenantModal(tenant) {
   document.getElementById('tm-colour').value = tenant?.primary_colour || '#2563eb';
   document.getElementById('tm-logo-url').value = tenant?.logo_url || '';
   document.getElementById('tm-terms-url').value = tenant?.terms_url || '';
+  document.getElementById('tm-register-claim-url').value = tenant?.register_claim_url || '';
   document.getElementById('tm-policy-url').value = tenant?.policy_api_url || '';
   document.getElementById('tm-policy-key').value = '';
   document.getElementById('tm-policy-mode').value = tenant?.policy_api_mode || 'stub';
@@ -1185,6 +1235,9 @@ function openTenantModal(tenant) {
   document.getElementById('tm-modulr-account').value = tenant?.modulr_account_id || '';
   document.getElementById('tm-modulr-key').value = '';
   document.getElementById('tm-modulr-mode').value = tenant?.modulr_mode || 'stub';
+  document.getElementById('tm-min-hours').value = tenant?.min_hours_before_dep || 24;
+  document.getElementById('tm-max-days').value = tenant?.max_days_before_dep || 40;
+  document.getElementById('tm-portal-label').value = tenant?.portal_label || '';
   document.getElementById('tenant-modal-title').textContent = tenant ? 'Edit Tenant' : 'New Tenant';
   document.getElementById('tenant-modal-error').style.display = 'none';
   updateLogoPreview();
@@ -1208,12 +1261,16 @@ async function saveTenant() {
     support_email:   document.getElementById('tm-support-email').value.trim() || null,
     primary_colour:  document.getElementById('tm-colour').value,
     logo_url:        document.getElementById('tm-logo-url').value.trim() || null,
-    terms_url:       document.getElementById('tm-terms-url').value.trim() || null,
+    terms_url:           document.getElementById('tm-terms-url').value.trim() || null,
+    register_claim_url:  document.getElementById('tm-register-claim-url').value.trim() || null,
     policy_api_url:      document.getElementById('tm-policy-url').value.trim() || null,
     policy_api_mode:     document.getElementById('tm-policy-mode').value,
     cover_benefit_name:  document.getElementById('tm-cover-benefit').value.trim() || null,
     modulr_account_id:   document.getElementById('tm-modulr-account').value.trim() || null,
     modulr_mode:         document.getElementById('tm-modulr-mode').value,
+    min_hours_before_dep: parseInt(document.getElementById('tm-min-hours').value, 10) || 24,
+    max_days_before_dep:  parseInt(document.getElementById('tm-max-days').value, 10) || 40,
+    portal_label:         document.getElementById('tm-portal-label').value.trim() || null,
   };
 
   const policyKey = document.getElementById('tm-policy-key').value;
@@ -1763,10 +1820,12 @@ async function loadSimNotifications() {
     el.innerHTML = '<div class="empty">No notifications yet</div>'; return;
   }
   el.innerHTML = `<table>
-    <thead><tr><th>Recipient</th><th>Status</th><th>Sent</th></tr></thead>
+    <thead><tr><th>Flight</th><th>Recipient</th><th>Status</th><th>Error</th><th>Sent</th></tr></thead>
     <tbody>${res.data.map(n => `<tr>
-      <td>${n.recipient}</td>
-      <td>${n.status==='sent'?'<span class="badge badge-green">sent</span>':'<span class="badge badge-red">'+n.status+'</span>'}</td>
+      <td><small>${n.flight_number || '–'}</small></td>
+      <td><small>${esc(n.recipient)}</small></td>
+      <td>${n.status==='sent'?'<span class="badge badge-green">sent</span>':'<span class="badge badge-red">'+esc(n.status)+'</span>'}</td>
+      <td class="text-muted"><small>${n.error_message ? esc(n.error_message) : '–'}</small></td>
       <td class="text-muted"><small>${n.sent_at ? fmtDateTime(n.sent_at) : '–'}</small></td>
     </tr>`).join('')}</tbody>
   </table>`;
@@ -1819,6 +1878,8 @@ function populateSettings(t) {
   document.getElementById('st-logo-url').value = t.logo_url || '';
   document.getElementById('st-colour').value = t.primary_colour || '#2563eb';
   document.getElementById('st-terms-url').value = t.terms_url || '';
+  document.getElementById('st-claim-url').value = t.claim_url || '';
+  document.getElementById('st-register-claim-url').value = t.register_claim_url || '';
   document.getElementById('st-policy-url').value = t.policy_api_url || '';
   document.getElementById('st-policy-key').value = '';
   document.getElementById('st-policy-mode').value = t.policy_api_mode || 'stub';
@@ -1850,6 +1911,8 @@ async function saveTenantSettings() {
     logo_url:               document.getElementById('st-logo-url').value.trim() || null,
     primary_colour:         document.getElementById('st-colour').value,
     terms_url:              document.getElementById('st-terms-url').value.trim() || null,
+    claim_url:              document.getElementById('st-claim-url').value.trim() || null,
+    register_claim_url:     document.getElementById('st-register-claim-url').value.trim() || null,
     policy_api_url:         document.getElementById('st-policy-url').value.trim() || null,
     policy_api_mode:        document.getElementById('st-policy-mode').value,
     cover_benefit_name:     document.getElementById('st-cover-benefit').value.trim() || null,
@@ -1861,6 +1924,9 @@ async function saveTenantSettings() {
 
   const policyKey = document.getElementById('st-policy-key').value;
   if (policyKey) body.policy_api_key = policyKey;
+
+  const policySecret = document.getElementById('st-policy-secret').value;
+  if (policySecret) body.policy_api_secret = policySecret;
 
   const modulrKey = document.getElementById('st-modulr-key').value;
   if (modulrKey) body.modulr_api_key = modulrKey;

@@ -11,8 +11,15 @@ const nodemailer = require('nodemailer');
 const { query }  = require('../db/connection');
 const config     = require('../config');
 
+function tenantPortalUrl(tenant) {
+  if (!tenant?.slug) return null;
+  const host = `${tenant.slug}.${config.baseDomain}`;
+  if (config.isProduction) return `https://${host}`;
+  return `http://${host}:${config.port}`;
+}
+
 const PLATFORM_NAME = 'Flight Delay Protection';
-const FROM_ADDRESS  = `"${PLATFORM_NAME}" <noreply@platform.co.uk>`;
+const FROM_ADDRESS  = '"Flight Delay Protection" <delayed.paid@frostie.uk>';
 
 // ── Transport ─────────────────────────────────────────────────────────────────
 // PRODUCTION: replace this function body with your production mail transport
@@ -24,6 +31,7 @@ function createTransport() {
       user: config.smtp.user,
       pass: config.smtp.pass,
     },
+    tls: { rejectUnauthorized: false },
   });
 }
 
@@ -33,7 +41,7 @@ function buildEmailHtml({ heading, subheading, bodyLines, policyNumber, tenant, 
   const companyName = tenant?.name || PLATFORM_NAME;
 
   const rows = bodyLines.map((l) =>
-    `<tr><td style="padding:6px 0;color:#374151;font-size:15px;line-height:1.6;">${l}</td></tr>`
+    `<tr><td style="padding:10px 0 0;color:#374151;font-size:15px;line-height:1.6;">${l}</td></tr>`
   ).join('');
 
   return `<!DOCTYPE html>
@@ -46,7 +54,10 @@ function buildEmailHtml({ heading, subheading, bodyLines, policyNumber, tenant, 
 
         <tr>
           <td style="background:${brandColor};padding:28px 36px;">
-            <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">${companyName}</div>
+            ${tenant?.logo_url
+              ? `<img src="${tenant.logo_url}" alt="${companyName}" style="display:block;max-height:48px;max-width:200px;object-fit:contain;margin-bottom:6px;">`
+              : `<div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">${companyName}</div>`
+            }
             <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:2px;">Flight Delay Protection</div>
           </td>
         </tr>
@@ -83,6 +94,15 @@ function buildEmailHtml({ heading, subheading, bodyLines, policyNumber, tenant, 
           </td>
         </tr>
 
+        ${tenant?.register_claim_url ? `
+        <tr><td style="padding:28px 36px 0;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></td></tr>
+        <tr>
+          <td style="padding:24px 36px 0;">
+            <div style="font-size:14px;color:#374151;margin-bottom:14px;">If you wish to register any other type of claim under your policy, click the link below.</div>
+            <a href="${tenant.register_claim_url}" style="display:block;text-align:center;background:${brandColor};color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:13px 20px;border-radius:8px;">Register your claim online</a>
+          </td>
+        </tr>` : ''}
+
         <tr>
           <td style="padding:28px 36px;border-top:1px solid #f3f4f6;margin-top:28px;">
             <div style="font-size:12px;color:#9ca3af;line-height:1.7;">
@@ -99,31 +119,162 @@ function buildEmailHtml({ heading, subheading, bodyLines, policyNumber, tenant, 
 </html>`;
 }
 
+// ── Flight card HTML for emails ───────────────────────────────────────────────
+function flightCardHtml(f, brandColor) {
+  const depTime = f.scheduled_dep_time ? f.scheduled_dep_time.slice(0, 5) : null;
+  const arrTime = f.scheduled_arr_time ? f.scheduled_arr_time.slice(0, 5) : null;
+  const depLabel = [f.dep_name, f.dep_iata].filter(Boolean).join(' · ');
+  const arrLabel = [f.arr_name, f.arr_iata].filter(Boolean).join(' · ');
+  const depDate  = f.dep_date instanceof Date
+    ? f.dep_date.toISOString().slice(0, 10)
+    : String(f.dep_date).slice(0, 10);
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden;">
+    <tr>
+      <td style="background:#f8fafc;padding:10px 16px;border-bottom:1px solid #e5e7eb;">
+        <span style="font-family:monospace;font-size:13px;font-weight:800;color:${brandColor};background:#eff6ff;padding:3px 12px;border-radius:20px;">${f.flight_number}</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="text-align:left;width:42%">
+              <div style="font-size:28px;font-weight:800;font-family:monospace;color:#111827;letter-spacing:-1px;">${f.dep_iata || '?'}</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">${depLabel || ''}</div>
+            </td>
+            <td style="text-align:center;color:#9ca3af;font-size:18px;">✈</td>
+            <td style="text-align:right;width:42%">
+              <div style="font-size:28px;font-weight:800;font-family:monospace;color:#111827;letter-spacing:-1px;">${f.arr_iata || '?'}</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">${arrLabel || ''}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f8fafc;padding:10px 16px;border-top:1px solid #e5e7eb;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="font-size:12px;color:#6b7280;text-align:left">📅 ${depDate}</td>
+            <td style="font-size:12px;color:#6b7280;text-align:right">${depTime && arrTime ? `🕐 ${depTime} → ${arrTime}` : ''}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>`;
+}
+
 // ── Send registration confirmation ────────────────────────────────────────────
 async function sendRegistrationConfirmation(registration, flights, tenant) {
-  const flightList = flights.map(
-    (f) => `• ${f.flight_number} — ${f.dep_iata || ''} → ${f.arr_iata || ''} on ${f.dep_date}`
-  ).join('<br>');
+  const brandColor  = tenant?.primary_colour || '#1a56db';
+  const companyName = tenant?.name || PLATFORM_NAME;
+  const payoutStr   = `£${(registration.payout_pence / 100).toFixed(0)}`;
+  const subject     = `You're protected — ${companyName} Flight Delay`;
 
-  const payoutStr = `£${(registration.payout_pence / 100).toFixed(0)}`;
-  const subject = `Your flight protection is registered — ${tenant?.name || PLATFORM_NAME}`;
+  const flightCards = flights.map(f => flightCardHtml(f, brandColor)).join('');
 
-  const html = buildEmailHtml({
-    heading:     'Your flights are registered',
-    subheading:  `We'll watch your flights and pay you automatically if there's a delay.`,
-    bodyLines: [
-      `Hi ${registration.first_name},`,
-      `Your flight delay protection is now active. Here are your registered flights:<br><br>${flightList}`,
-      `If any flight is delayed beyond the threshold or cancelled, <strong>${payoutStr}</strong> will be automatically transferred to your registered bank account.`,
-      `No action is required from you.`,
-    ],
-    policyNumber: registration.policy_number,
-    tenant,
-    badgeLabel: 'Registration Confirmed',
-    badgeColor: '#1a56db',
-  });
+  const myAccountUrl = tenantPortalUrl(tenant);
+  const claimUrl     = tenant?.claim_url || null;
 
-  const text = `Hi ${registration.first_name},\n\nYour flight delay protection is registered. Policy: ${registration.policy_number}\n\n— ${tenant?.name || PLATFORM_NAME}`;
+  // Side-by-side buttons
+  const buttonsHtml = (myAccountUrl || claimUrl) ? `
+    <tr><td style="padding:28px 36px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        ${myAccountUrl ? `<td style="padding-right:6px">
+          <a href="${myAccountUrl}" style="display:block;text-align:center;background:${brandColor};color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:13px 20px;border-radius:8px;">View My Account</a>
+        </td>` : ''}
+        ${claimUrl ? `<td style="${myAccountUrl ? 'padding-left:6px' : ''}">
+          <a href="${claimUrl}" style="display:block;text-align:center;background:#6b7280;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:13px 20px;border-radius:8px;">Make a Claim</a>
+        </td>` : ''}
+      </tr></table>
+    </td></tr>` : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="580" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+        <tr><td style="background:${brandColor};padding:28px 36px;">
+          ${tenant?.logo_url
+            ? `<img src="${tenant.logo_url}" alt="${companyName}" style="display:block;max-height:48px;max-width:200px;object-fit:contain;margin-bottom:6px;">`
+            : `<div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">${companyName}</div>`
+          }
+          <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:2px;">Flight Delay Protection</div>
+        </td></tr>
+
+        <tr><td style="padding:28px 36px 0;">
+          <span style="display:inline-block;background:#16a34a;color:#ffffff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;padding:4px 14px;border-radius:20px;">Registration Confirmed</span>
+        </td></tr>
+
+        <tr><td style="padding:16px 36px 0;">
+          <div style="font-size:24px;font-weight:800;color:#1a1a2e;line-height:1.3;">You're protected, ${registration.first_name}!</div>
+          <div style="font-size:15px;color:#6b7280;margin-top:6px;">Your flights are registered. We'll pay you automatically if there's a qualifying delay.</div>
+        </td></tr>
+
+        <tr><td style="padding:20px 36px 0;">
+          <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:12px;">Here ${flights.length === 1 ? 'is' : 'are'} your registered flight${flights.length === 1 ? '' : 's'}:</div>
+          ${flightCards}
+        </td></tr>
+
+        <tr><td style="padding:20px 36px 0;">
+          <div style="font-size:14px;color:#374151;line-height:1.7;background:#f8fafc;border-radius:8px;padding:14px 18px;">
+            If any flight is delayed or cancelled beyond the cover threshold, <strong>${payoutStr} per person</strong> will be automatically transferred to your registered bank account — no claim needed.
+          </div>
+        </td></tr>
+
+        ${buttonsHtml}
+
+        <tr><td style="padding:24px 36px 0;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4ff;border-radius:8px;border-left:4px solid ${brandColor};">
+            <tr><td style="padding:14px 18px;">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#6b7280;">Policy Number</div>
+              <div style="font-size:16px;font-weight:700;color:${brandColor};font-family:monospace;margin-top:4px;">${registration.policy_number}</div>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        ${tenant?.register_claim_url ? `
+        <tr><td style="padding:28px 36px 0;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></td></tr>
+        <tr><td style="padding:24px 36px 0;">
+          <div style="font-size:14px;color:#374151;margin-bottom:14px;">If you wish to register any other type of claim under your policy, click the link below.</div>
+          <a href="${tenant.register_claim_url}" style="display:block;text-align:center;background:${brandColor};color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:13px 20px;border-radius:8px;">Register your claim online</a>
+        </td></tr>` : ''}
+
+        <tr><td style="padding:28px 36px;border-top:1px solid #f3f4f6;margin-top:8px;">
+          <div style="font-size:12px;color:#9ca3af;line-height:1.7;">
+            This is an automated notification from ${companyName}.<br>
+            ${tenant?.support_email ? `If you have questions, contact us at ${tenant.support_email}` : ''}
+          </div>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const textFlights = flights.map(f => {
+    const depDate = f.dep_date instanceof Date ? f.dep_date.toISOString().slice(0, 10) : String(f.dep_date).slice(0, 10);
+    return `  • ${f.flight_number}  ${f.dep_iata || ''} → ${f.arr_iata || ''}  ${depDate}`;
+  }).join('\n');
+
+  const text = [
+    `Hi ${registration.first_name},`,
+    ``,
+    `Your flight delay protection is confirmed. Policy: ${registration.policy_number}`,
+    ``,
+    textFlights,
+    ``,
+    myAccountUrl ? `My Account: ${myAccountUrl}` : '',
+    claimUrl     ? `Make a claim: ${claimUrl}` : '',
+    ``,
+    `— ${companyName}`,
+  ].filter(l => l !== undefined).join('\n');
 
   await _send({ registrationId: registration.id, email: registration.email }, subject, html, text, null, null, null, tenant);
 }
@@ -289,7 +440,8 @@ async function _send(ctx, subject, html, text, flightRegId, flightEventId, payme
 
   try {
     const transport = createTransport();
-    await transport.sendMail({ from: FROM_ADDRESS, to: ctx.email, subject, html, text });
+    const to = config.devEmailOverride || ctx.email;
+    await transport.sendMail({ from: FROM_ADDRESS, to, subject, html, text });
     await query(`UPDATE notifications SET status = 'sent', sent_at = NOW() WHERE id = $1`, [notifId]);
     console.log(`[notifications] Email sent to ${ctx.email}`);
   } catch (err) {

@@ -4,12 +4,22 @@ const express = require('express');
 const { query } = require('../db/connection');
 const { decrypt } = require('../services/encryption');
 const config = require('../config');
-const airportDb = require('../data/airports.json');
 
-function airportName(iata) {
-  const a = airportDb[iata];
-  if (!a) return null;
-  return `${a.name} (${a.city}, ${a.country})`;
+// In-process airport name cache to avoid repeated DB lookups per request
+const _airportCache = new Map();
+
+async function airportName(iata) {
+  if (!iata) return null;
+  if (_airportCache.has(iata)) return _airportCache.get(iata);
+  const result = await query(
+    `SELECT airport_name, city, country_name FROM ref_airports WHERE iata_code = $1`,
+    [iata]
+  );
+  if (result.rows.length === 0) { _airportCache.set(iata, null); return null; }
+  const r = result.rows[0];
+  const name = [r.airport_name, r.city, r.country_name].filter(Boolean).join(', ');
+  _airportCache.set(iata, name);
+  return name;
 }
 
 const router = express.Router();
@@ -57,6 +67,13 @@ function calcTooSoon(tenant, date, depTime) {
   return (depDateTime - Date.now()) / (1000 * 60 * 60) < minHours;
 }
 
+function calcTooFar(tenant, date) {
+  if (!tenant) return false;
+  const maxDays = tenant.max_days_before_dep || 40;
+  const depDateTime = new Date(`${date}T00:00:00`);
+  return (depDateTime - Date.now()) / (1000 * 60 * 60 * 24) > maxDays;
+}
+
 function fmtDuration(minutes) {
   if (!minutes || minutes <= 0) return null;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
@@ -90,6 +107,8 @@ router.get('/route', async (req, res) => {
   const carriers = ['BA', 'VS', 'AA', 'UA'];
   const slots    = [['07:15','10:05'], ['10:40','13:30'], ['13:55','16:45'], ['17:20','20:10']];
 
+  const [depNameStr, arrNameStr] = await Promise.all([airportName(dep), airportName(arr)]);
+
   const flights = slots.map(([ depTime, arrTime ], i) => {
     const code = carriers[i % carriers.length];
     const num  = 100 + (i + 1) * 77;
@@ -103,17 +122,18 @@ router.get('/route', async (req, res) => {
       number: `${code}${num}`,
       carrierCode: code,
       depIata: dep,
-      depName: airportName(dep),
+      depName: depNameStr,
       depTime,
       depDate: date,
       arrIata: arr,
-      arrName: airportName(arr),
+      arrName: arrNameStr,
       arrTime,
       arrDate: date,
       duration: `${Math.floor(mins / 60)}h ${mins % 60}m`,
       status: 'Scheduled',
       statusClass: 'status-ontime',
       tooSoon: calcTooSoon(req.tenant, date, depTime),
+      tooFar:  calcTooFar(req.tenant, date),
       stub: true,
     };
   });
@@ -166,8 +186,9 @@ router.get('/', async (req, res) => {
       aircraftIata: '788',
       status:       'Scheduled',
       statusClass:  'status-ontime',
-      tooSoon:      calcTooSoon(req.tenant, date, stubDepTime),
-      stub:         true,
+      tooSoon: calcTooSoon(req.tenant, date, stubDepTime),
+      tooFar:  calcTooFar(req.tenant, date),
+      stub:    true,
     };
     return res.json(stubResult);
   }
@@ -175,7 +196,7 @@ router.get('/', async (req, res) => {
   const cacheKey = getFlightCacheKey(flight, date);
   const cached = _flightCache.get(cacheKey);
   if (cached && Date.now() < cached.expiry) {
-    return res.json({ ...cached.data, tooSoon: calcTooSoon(req.tenant, date, cached.data.depTime) });
+    return res.json({ ...cached.data, tooSoon: calcTooSoon(req.tenant, date, cached.data.depTime), tooFar: calcTooFar(req.tenant, date) });
   }
 
   const params = new URLSearchParams({
@@ -235,7 +256,9 @@ router.get('/', async (req, res) => {
         arrIata: 'JFK', arrName: 'New York JFK',     arrTime: '12:45', arrDate: date,
         duration: '7h 15m', aircraftIata: '788',
         status: 'Scheduled', statusClass: 'status-ontime',
-        tooSoon: calcTooSoon(req.tenant, date, '09:30'), stub: true,
+        tooSoon: calcTooSoon(req.tenant, date, '09:30'),
+        tooFar:  calcTooFar(req.tenant, date),
+        stub: true,
       });
     }
     return res.status(502).json({ found: false, error: 'Flight data unavailable' });
@@ -253,6 +276,8 @@ router.get('/', async (req, res) => {
   const depIata = f.departure?.airport?.iata || null;
   const arrIata = f.arrival?.airport?.iata   || null;
 
+  const [depNameStr, arrNameStr] = await Promise.all([airportName(depIata), airportName(arrIata)]);
+
   const result = {
     found:        true,
     carrier:      f.carrier?.iata || carrierCode,
@@ -260,11 +285,11 @@ router.get('/', async (req, res) => {
     carrierCode,
     flightNum,
     depIata,
-    depName:      airportName(depIata),
+    depName:      depNameStr,
     depTime:      f.departure?.time?.local   || null,
     depDate:      f.departure?.date?.local   || date,
     arrIata,
-    arrName:      airportName(arrIata),
+    arrName:      arrNameStr,
     arrTime:      f.arrival?.time?.local     || null,
     arrDate:      f.arrival?.date?.local     || null,
     duration:     fmtDuration(f.elapsedTime),
@@ -277,7 +302,7 @@ router.get('/', async (req, res) => {
   const ttl = isToday(date) ? CACHE_TTL_TODAY_MS : CACHE_TTL_FUTURE_MS;
   _flightCache.set(cacheKey, { data: result, expiry: Date.now() + ttl });
 
-  return res.json({ ...result, tooSoon: calcTooSoon(req.tenant, result.depDate || date, result.depTime) });
+  return res.json({ ...result, tooSoon: calcTooSoon(req.tenant, result.depDate || date, result.depTime), tooFar: calcTooFar(req.tenant, result.depDate || date) });
 });
 
 module.exports = router;

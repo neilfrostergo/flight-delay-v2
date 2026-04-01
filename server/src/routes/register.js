@@ -5,6 +5,7 @@ const Joi = require('joi');
 const { withTransaction, query } = require('../db/connection');
 const { encrypt } = require('../services/encryption');
 const { getOrCreateSubscription } = require('../services/oagAlerts');
+const { sendRegistrationConfirmation } = require('../services/notificationService');
 
 const router = express.Router();
 
@@ -46,14 +47,32 @@ router.post('/', async (req, res) => {
   }
 
   const minHours = req.tenant.min_hours_before_dep || 24;
+  const maxDays  = req.tenant.max_days_before_dep  || 40;
   const now = Date.now();
 
   for (const flight of value.flights) {
-    const depMs = new Date(`${flight.dep_date}T00:00:00Z`).getTime();
+    const depMs = new Date(`${flight.dep_date}T00:00:00`).getTime();
     const hoursUntil = (depMs - now) / (1000 * 60 * 60);
+    const daysUntil  = hoursUntil / 24;
+
     if (hoursUntil < minHours) {
       return res.status(422).json({
         error: `Flight ${flight.flight_number} on ${flight.dep_date} must be registered at least ${minHours} hours before departure`,
+      });
+    }
+    if (daysUntil > maxDays) {
+      return res.status(422).json({
+        error: `Flight ${flight.flight_number} on ${flight.dep_date} cannot be registered more than ${maxDays} days before departure`,
+      });
+    }
+    if (value.cover_start_date && flight.dep_date < value.cover_start_date) {
+      return res.status(422).json({
+        error: `Flight ${flight.flight_number} on ${flight.dep_date} is before your policy cover start date (${value.cover_start_date})`,
+      });
+    }
+    if (value.cover_end_date && flight.dep_date > value.cover_end_date) {
+      return res.status(422).json({
+        error: `Flight ${flight.flight_number} on ${flight.dep_date} is after your policy cover end date (${value.cover_end_date})`,
       });
     }
   }
@@ -115,10 +134,16 @@ router.post('/', async (req, res) => {
         existingFlights.rows.map(f => `${f.flight_number}|${f.dep_date.slice(0, 10)}`)
       );
 
-      // Insert each flight, silently skipping any already on this registration
+      // Check for duplicate flights — reject if any submitted flight is already registered
+      const duplicates = value.flights.filter(f => registered.has(`${f.flight_number}|${f.dep_date}`));
+      if (duplicates.length > 0) {
+        const names = duplicates.map(f => `${f.flight_number} on ${f.dep_date}`).join(', ');
+        throw Object.assign(new Error(`Flight already registered: ${names}`), { statusCode: 409 });
+      }
+
+      // Insert each flight
       const flightRows = [];
       for (const f of value.flights) {
-        if (registered.has(`${f.flight_number}|${f.dep_date}`)) continue;
 
         const fr = await client.query(
           `INSERT INTO flight_registrations
@@ -137,7 +162,7 @@ router.post('/', async (req, res) => {
             f.scheduled_arr_time || null,
           ]
         );
-        flightRows.push({ ...fr.rows[0], carrier_code: f.carrier_code });
+        flightRows.push({ ...f, ...fr.rows[0] });
       }
 
       // Mark pre-validation token as used (new registrations only)
@@ -153,6 +178,9 @@ router.post('/', async (req, res) => {
       return { regRow, flightRows };
     });
   } catch (err) {
+    if (err.statusCode === 409) {
+      return res.status(409).json({ error: err.message });
+    }
     console.error('[register] DB error:', err.message);
     return res.status(500).json({ error: 'Registration failed — please try again' });
   }
@@ -160,7 +188,9 @@ router.post('/', async (req, res) => {
   // Fire-and-forget: set up OAG alert subscriptions for each flight
   for (const fr of registration.flightRows) {
     const flightStr = String(fr.flight_number).replace(/[^A-Z0-9]/gi, '');
-    getOrCreateSubscription(flightStr, fr.dep_date.toISOString().slice(0, 10))
+    getOrCreateSubscription(flightStr, fr.dep_date instanceof Date
+      ? `${fr.dep_date.getFullYear()}-${String(fr.dep_date.getMonth()+1).padStart(2,'0')}-${String(fr.dep_date.getDate()).padStart(2,'0')}`
+      : String(fr.dep_date).slice(0, 10))
       .then((subscriptionId) => {
         if (subscriptionId) {
           return query(
@@ -171,6 +201,47 @@ router.post('/', async (req, res) => {
       })
       .catch((err) => console.error('[register] OAG subscription error:', err.message));
   }
+
+  // Fire-and-forget: send confirmation email with enriched airport names
+  (async () => {
+    try {
+      const regRow = registration.regRow;
+      const flightRows = registration.flightRows;
+
+      // Enrich with airport names from ref_airports
+      const iatas = [...new Set([
+        ...flightRows.map(f => f.dep_iata).filter(Boolean),
+        ...flightRows.map(f => f.arr_iata).filter(Boolean),
+      ])];
+      let airportMap = {};
+      if (iatas.length) {
+        const r = await query(
+          `SELECT iata_code, airport_name, country_name FROM ref_airports WHERE iata_code = ANY($1)`,
+          [iatas]
+        );
+        r.rows.forEach(a => { airportMap[a.iata_code] = [a.airport_name, a.country_name].filter(Boolean).join(', '); });
+      }
+
+      const enrichedFlights = flightRows.map(f => ({
+        flight_number:      f.flight_number,
+        dep_iata:           f.dep_iata,
+        arr_iata:           f.arr_iata,
+        dep_name:           airportMap[f.dep_iata] || null,
+        arr_name:           airportMap[f.arr_iata] || null,
+        dep_date:           f.dep_date,
+        scheduled_dep_time: f.scheduled_dep_time || null,
+        scheduled_arr_time: f.scheduled_arr_time || null,
+      }));
+
+      await sendRegistrationConfirmation(
+        { ...regRow, payout_pence: value.payout_pence, email: value.email, first_name: value.first_name },
+        enrichedFlights,
+        req.tenant
+      );
+    } catch (err) {
+      console.error('[register] Confirmation email error:', err.message);
+    }
+  })();
 
   return res.status(201).json({
     registrationId: registration.regRow.id,

@@ -14,6 +14,7 @@ router.get('/', async (req, res) => {
 
   const result = await query(
     `SELECT id, slug, name, subdomain, logo_url, primary_colour, terms_url, support_email,
+            claim_url, register_claim_url, my_account_url,
             policy_api_url, policy_api_mode, cover_benefit_name,
             modulr_account_id, modulr_mode,
             token_ttl_days, delay_threshold_minutes, min_hours_before_dep,
@@ -31,34 +32,37 @@ router.patch('/', async (req, res) => {
   if (!tenantId) return res.status(403).json({ error: 'Superadmins use /api/admin/tenants/:id' });
 
   const existing = await query(
-    'SELECT policy_api_key_enc, modulr_api_key_enc, slug FROM tenants WHERE id = $1',
+    'SELECT policy_api_key_enc, policy_api_secret_enc, modulr_api_key_enc, slug FROM tenants WHERE id = $1',
     [tenantId]
   );
   if (existing.rows.length === 0) return res.status(404).json({ error: 'Tenant not found' });
   const prev = existing.rows[0];
 
   const {
-    name, support_email, logo_url, primary_colour, terms_url,
-    policy_api_url, policy_api_key, policy_api_mode, cover_benefit_name,
+    name, support_email, logo_url, primary_colour, terms_url, claim_url, register_claim_url, my_account_url,
+    policy_api_url, policy_api_key, policy_api_secret, policy_api_mode, cover_benefit_name,
     modulr_account_id, modulr_api_key, modulr_mode,
     token_ttl_days, delay_threshold_minutes, min_hours_before_dep,
   } = req.body || {};
 
-  const policyKeyEnc = policy_api_key ? encrypt(policy_api_key) : prev.policy_api_key_enc;
-  const modulrKeyEnc = modulr_api_key  ? encrypt(modulr_api_key)  : prev.modulr_api_key_enc;
+  const policyKeyEnc    = policy_api_key    ? encrypt(policy_api_key)    : prev.policy_api_key_enc;
+  const policySecretEnc = policy_api_secret ? encrypt(policy_api_secret) : prev.policy_api_secret_enc;
+  const modulrKeyEnc    = modulr_api_key    ? encrypt(modulr_api_key)    : prev.modulr_api_key_enc;
 
   await query(
     `UPDATE tenants SET
        name=$1, support_email=$2, logo_url=$3, primary_colour=$4, terms_url=$5,
-       policy_api_url=$6, policy_api_key_enc=$7, policy_api_mode=$8, cover_benefit_name=$9,
-       modulr_account_id=$10, modulr_api_key_enc=$11, modulr_mode=$12,
-       token_ttl_days=$13, delay_threshold_minutes=$14, min_hours_before_dep=$15,
+       claim_url=$6, register_claim_url=$7, my_account_url=$8,
+       policy_api_url=$9, policy_api_key_enc=$10, policy_api_secret_enc=$11, policy_api_mode=$12,
+       cover_benefit_name=$13, modulr_account_id=$14, modulr_api_key_enc=$15, modulr_mode=$16,
+       token_ttl_days=$17, delay_threshold_minutes=$18, min_hours_before_dep=$19,
        updated_at=NOW()
-     WHERE id=$16`,
+     WHERE id=$20`,
     [
       name || null, support_email || null, logo_url || null,
       primary_colour || '#1a56db', terms_url || null,
-      policy_api_url || null, policyKeyEnc, policy_api_mode || 'stub',
+      claim_url || null, register_claim_url || null, my_account_url || null,
+      policy_api_url || null, policyKeyEnc, policySecretEnc, policy_api_mode || 'stub',
       cover_benefit_name || 'Flight Delay',
       modulr_account_id || null, modulrKeyEnc, modulr_mode || 'stub',
       token_ttl_days || 7, delay_threshold_minutes || 180, min_hours_before_dep || 24,

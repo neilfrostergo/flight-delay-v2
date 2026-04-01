@@ -428,59 +428,115 @@
     .flight-card {
       border: 1.5px solid var(--border);
       border-radius: var(--radius-sm);
-      padding: 14px 16px;
+      padding: 16px;
       display: flex;
-      align-items: center;
-      gap: 14px;
+      flex-direction: column;
+      gap: 12px;
       transition: border-color 0.2s, box-shadow 0.2s;
       cursor: default;
+      background: #fff;
     }
-    .flight-card:hover { border-color: #a5b4fc; box-shadow: var(--shadow-sm); }
+    .flight-card:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); }
 
-    .flight-airline {
-      width: 40px;
-      height: 40px;
-      background: var(--brand-light);
-      border-radius: 8px;
+    .flight-card-top {
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 11px;
+      gap: 12px;
+    }
+
+    .flight-airline { display: none; }
+
+    .flight-num-badge {
+      font-size: 16px;
       font-weight: 800;
       color: var(--brand);
-      letter-spacing: 0.5px;
-      flex-shrink: 0;
+      background: var(--brand-light);
+      padding: 6px 16px;
+      border-radius: 8px;
       font-family: 'Courier New', monospace;
+      letter-spacing: 0.5px;
     }
 
     .flight-info { flex: 1; min-width: 0; }
 
-    .flight-route-display {
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
+    .flight-route-row {
       display: flex;
-      align-items: center;
-      gap: 8px;
+      align-items: flex-start;
+      gap: 0;
+      margin-bottom: 2px;
     }
 
-    .route-arrow { color: var(--muted); font-size: 14px; font-weight: 400; }
+    .flight-endpoint {
+      flex: 1;
+      min-width: 0;
+    }
+    .flight-endpoint.arr { text-align: right; }
+
+    .flight-iata {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+    }
+
+    .flight-airport-name {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .flight-route-connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4px 10px 0;
+      flex-shrink: 0;
+      gap: 3px;
+    }
+
+    .flight-route-connector .conn-line {
+      width: 50px;
+      height: 1.5px;
+      background: var(--border);
+      position: relative;
+    }
+    .flight-route-connector .conn-line::after {
+      content: '✈';
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: var(--brand);
+    }
 
     .flight-meta {
       font-size: 12px;
       color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
       margin-top: 2px;
     }
 
-    .flight-num-badge {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--brand);
-      background: var(--brand-light);
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-family: 'Courier New', monospace;
+    .flight-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      justify-content: center;
     }
+    .flight-meta-item:first-child { justify-content: flex-start; }
+    .flight-meta-item:last-child  { justify-content: flex-end; }
+
+    .route-arrow { display: none; }
 
     /* ── Policy type badge ───────────────────────────────────────────────────── */
     .policy-type-badge {
@@ -755,7 +811,7 @@
 
     /* ── Customer Portal ─────────────────────────────────────────────────────── */
     #portal-view { min-height: calc(100vh - 64px); }
-    .portal-container { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
+    .portal-container { max-width: 640px; margin: 0 auto; padding: 28px 16px 80px; }
 
     .portal-summary-card {
       background: var(--white);
@@ -913,6 +969,8 @@
     .demo-table .demo-em  { color: var(--text); }
     .demo-table .demo-st  { color: var(--muted); font-size: 12px; }
     .demo-footer { margin-top: 10px; font-size: 12px; color: var(--warn); }
+    .demo-login-btn { font-size: 11px; padding: 2px 8px; border: 1px solid var(--warn); background: transparent; color: var(--warn); border-radius: 4px; cursor: pointer; white-space: nowrap; }
+    .demo-login-btn:hover { background: var(--warn); color: #fff; }
 
     /* ── Step visibility ─────────────────────────────────────────────────────── */
     .step { display: none; }
@@ -963,7 +1021,7 @@
     <div class="header-brand" id="header-brand">Flight Delay Protection</div>
     <div class="header-sub" id="header-sub">Register your flight for automatic payout</div>
   </div>
-  <button class="portal-nav-btn" id="portal-toggle-btn" onclick="togglePortal()">My Flights</button>
+  <button class="portal-nav-btn" id="portal-toggle-btn" onclick="togglePortal()">My Account</button>
 </header>
 
 <!-- ── Step indicator ────────────────────────────────────────────────────────── -->
@@ -1002,7 +1060,7 @@
   <!-- ─────────────────────── Step 1: Policy ───────────────────────────────── -->
   <div class="step active" id="step-1">
     <div class="card">
-      <div class="card-title">Register your protection</div>
+      <div class="card-title" id="step1-title">Register your flights</div>
       <div class="card-sub">Enter your policy number and the email address on your policy to get started.</div>
 
       <div id="validate-error" class="alert alert-error" style="display:none"></div>
@@ -1018,36 +1076,7 @@
       <button class="btn btn-primary btn-full" id="validate-btn" onclick="validatePolicy()">Continue →</button>
     </div>
 
-    <div class="demo-box">
-      <div class="demo-box-title">🧪 Demo test accounts</div>
-      <table class="demo-table">
-        <tr>
-          <td class="demo-pol">POL-001-ACTIVE</td>
-          <td class="demo-em">sarah.johnson@example.com</td>
-          <td class="demo-st">Active · 2 flights</td>
-        </tr>
-        <tr>
-          <td class="demo-pol">POL-002-PAID</td>
-          <td class="demo-em">j.williams@example.com</td>
-          <td class="demo-st">Paid · £250 sent</td>
-        </tr>
-        <tr>
-          <td class="demo-pol">POL-003-PENDING</td>
-          <td class="demo-em">emma.davies@example.com</td>
-          <td class="demo-st">Pending</td>
-        </tr>
-        <tr>
-          <td class="demo-pol">POL-004-ACTIVE</td>
-          <td class="demo-em">m.alhassan@example.com</td>
-          <td class="demo-st">Active</td>
-        </tr>
-      </table>
-      <div class="demo-footer">
-        Admin: <a href="/admin" style="color:var(--warn);font-weight:700">/admin</a> ·
-        superadmin: <code>admin / changeme</code> ·
-        tenant admin: <code>hx-admin / hx1234</code>
-      </div>
-    </div>
+    <div id="demo-box"></div>
   </div>
 
   <!-- ─────────────────────── Step 2: Flights ──────────────────────────────── -->
@@ -1072,9 +1101,11 @@
       </div>
 
       <div id="search-error"  class="alert alert-error" style="display:none"></div>
-      <div id="too-soon-alert" class="alert alert-warn"  style="display:none">
-        ⏱ This flight is too close to departure. Flights must be registered at least <strong id="min-hours"></strong> hours before departure.
+      <div id="too-soon-alert" class="alert alert-warn" style="display:none">
+        This flight must be registered at least <span id="min-hours">24</span> hours before departure.
       </div>
+      <div id="too-far-alert" class="alert alert-warn" style="display:none"></div>
+      <div id="outside-cover-alert" class="alert alert-error" style="display:none"></div>
 
       <!-- Search mode toggle -->
       <div class="search-tabs">
@@ -1147,7 +1178,7 @@
         <div id="basket-list"></div>
       </div>
 
-      <button class="btn btn-primary btn-full" id="flights-next-btn" onclick="goStep(3)" disabled style="margin-top:8px">
+      <button class="btn btn-primary btn-full" id="flights-next-btn" onclick="tryProceedFromFlights()" disabled style="margin-top:8px">
         Continue with <span id="basket-btn-count">0</span> flight(s) →
       </button>
     </div>
@@ -1267,6 +1298,18 @@
           <span>Funds arrive via Faster Payments — typically within two hours of confirmation.</span>
         </div>
       </div>
+
+      <!-- Action buttons -->
+      <div id="success-actions" style="margin-top:24px">
+        <div id="amt-hint" style="display:none;text-align:center;margin-bottom:12px;font-size:14px;color:var(--muted)">
+          Your Annual Multi-Trip policy lets you register more flights at any time.
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center">
+          <button id="add-another-btn" class="btn btn-primary" style="display:none" onclick="addAnotherFlight()">+ Register another flight</button>
+          <button class="btn btn-outline" onclick="window.location.reload()">Done</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1279,22 +1322,21 @@
     <!-- Login -->
     <div id="portal-login">
       <div class="card">
-        <div class="card-title">View your registered flights</div>
-        <div class="card-sub">Enter the policy number and email address you registered with.</div>
+        <div class="card-title" id="portal-login-title">Register your flights</div>
+        <div class="card-sub">Enter your policy number and the email address on your policy to get started.</div>
         <div id="portal-login-error" class="alert alert-error" style="display:none;margin-bottom:16px"></div>
         <div class="field">
           <label for="portal-policy-input">Policy number</label>
           <input id="portal-policy-input" type="text" placeholder="e.g. POL-001-ACTIVE" autocomplete="off">
         </div>
         <div class="field">
-          <label for="portal-email-input">Email address</label>
-          <input id="portal-email-input" type="email" placeholder="your@email.com" autocomplete="email"
+          <label for="portal-email-input">Email address on your policy</label>
+          <input id="portal-email-input" type="email" placeholder="you@example.com" autocomplete="email"
                  onkeydown="if(event.key==='Enter')portalLogin()">
         </div>
-        <div class="action-row">
-          <button class="btn btn-primary" id="portal-login-btn" onclick="portalLogin()">View my flights</button>
-        </div>
+        <button class="btn btn-primary btn-full" id="portal-login-btn" onclick="portalLogin()">Continue →</button>
       </div>
+      <div id="portal-demo-box"></div>
     </div>
 
     <!-- Dashboard -->
@@ -1305,7 +1347,10 @@
 
       <!-- Add flight -->
       <div style="margin-top:16px">
-        <button class="btn btn-outline" id="portal-add-toggle-btn" onclick="togglePortalAddFlight()">+ Add a flight</button>
+        <div style="display:flex;justify-content:space-between;margin-bottom:0">
+          <button class="btn btn-outline" id="portal-add-toggle-btn" onclick="togglePortalAddFlight()">+ Add a flight</button>
+          <button class="btn btn-outline" onclick="portalLogout()">Log out</button>
+        </div>
         <div id="portal-add-flight-form" style="display:none;margin-top:12px">
           <div class="card" style="padding:16px">
             <div class="card-title" style="font-size:15px;margin-bottom:12px">Add a flight</div>
@@ -1341,7 +1386,6 @@
         </div>
       </div>
 
-      <button class="btn btn-secondary" style="margin-top:16px" onclick="portalLogout()">Log out</button>
     </div>
 
   </div>
@@ -1356,6 +1400,7 @@ const state = {
   validated: null,
   basket: [],
   minHoursBeforeDep: 24,
+  maxDaysBeforeDep: 40,
   step: 1,
   searchMode: 'flightnum',
 };
@@ -1371,14 +1416,18 @@ const state = {
       state.tenant = await res.json();
       applyBranding(state.tenant);
       state.minHoursBeforeDep = state.tenant.minHoursBeforeDep || 24;
+      state.maxDaysBeforeDep  = state.tenant.maxDaysBeforeDep  || 40;
       document.querySelectorAll('#min-hours').forEach(el => el.textContent = state.minHoursBeforeDep);
     }
   } catch (_) {}
 
-  // Default dates to today
-  const today = todayStr();
-  setDate('fn', today);
-  setDate('rt', today);
+  renderDemoBox();
+
+  // Default dates to tomorrow (flights need 24h notice)
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  setDate('fn', tomorrowStr);
+  setDate('rt', tomorrowStr);
 
   if (token && /^[0-9a-f]{64}$/i.test(token)) {
     await consumeToken(token);
@@ -1415,6 +1464,39 @@ function applyBranding(tenant) {
   if (tenant.termsUrl) {
     document.getElementById('terms-link').href = tenant.termsUrl;
   }
+  if (tenant.portalLabel) {
+    document.getElementById('portal-toggle-btn').textContent = tenant.portalLabel;
+  }
+}
+
+// ── Full app reset (called on portal logout) ──────────────────────────────────
+function resetApp() {
+  // Wipe all personal data from memory
+  state.validated      = null;
+  state.basket         = [];
+  state.registrationId = null;
+
+  // Clear all form fields that may contain personal data
+  ['policy-number', 'policy-email', 'sort-code', 'account-number'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  // Clear search inputs and results
+  ['flight-search', 'fn-date', 'route-dep', 'route-arr', 'route-date'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const fr = document.getElementById('flight-result');
+  if (fr) fr.style.display = 'none';
+
+  // Clear basket and confirmation displays
+  renderBasket();
+  hideEl('validate-error');
+  hideEl('submit-error');
+
+  // Return to step 1
+  showStep(1);
 }
 
 // ── Step navigation ───────────────────────────────────────────────────────────
@@ -1459,6 +1541,8 @@ function setSearchMode(mode) {
   document.getElementById('tab-route').classList.toggle('active',     mode === 'route');
   hideEl('search-error');
   hideEl('too-soon-alert');
+  hideEl('too-far-alert');
+  hideEl('outside-cover-alert');
   document.getElementById('flight-result').style.display = 'none';
 }
 
@@ -1471,11 +1555,11 @@ const MONTH_NAMES = ['January','February','March','April','May','June',
 function openDatePicker(hiddenId, displayId) {
   const cur = document.getElementById(hiddenId).value;
   if (cur) {
-    const d = new Date(cur + 'T00:00:00Z');
-    dp.year = d.getUTCFullYear(); dp.month = d.getUTCMonth();
+    const d = new Date(cur + 'T00:00:00');
+    dp.year = d.getFullYear(); dp.month = d.getMonth();
   } else {
-    const now = new Date();
-    dp.year = now.getFullYear(); dp.month = now.getMonth();
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    dp.year = tomorrow.getFullYear(); dp.month = tomorrow.getMonth();
   }
   dp.hiddenId  = hiddenId;
   dp.displayId = displayId;
@@ -1484,10 +1568,18 @@ function openDatePicker(hiddenId, displayId) {
   const input = document.getElementById(displayId);
   const rect  = input.getBoundingClientRect();
   const el    = document.getElementById('dp-container');
-  el.style.top    = (rect.bottom + window.scrollY + 6) + 'px';
+  const top   = rect.bottom + window.scrollY + 6;
+  el.style.top    = top + 'px';
   el.style.left   = rect.left + 'px';
   el.style.width  = '224px';
   el.style.display = 'block';
+
+  // Auto-scroll if calendar will be clipped off screen
+  const dpHeight = 270;
+  const bottomEdge = rect.bottom + dpHeight + 6;
+  if (bottomEdge > window.innerHeight) {
+    window.scrollBy({ top: bottomEdge - window.innerHeight + 16, behavior: 'smooth' });
+  }
 }
 
 function renderDp() {
@@ -1499,11 +1591,13 @@ function renderDp() {
 
   let cells = '';
   for (let i = 0; i < firstDow; i++) cells += '<div class="dp-day dp-day-empty"></div>';
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowS = tomorrow.toISOString().slice(0, 10);
   for (let d = 1; d <= daysInM; d++) {
     const s = `${year}-${pad(month+1)}-${pad(d)}`;
-    const past = s < todayS;
-    const cls  = ['dp-day', past ? 'dp-past' : '', s === todayS ? 'dp-today' : '', s === selected ? 'dp-selected' : ''].filter(Boolean).join(' ');
-    cells += `<div class="${cls}" ${!past ? `onclick="selectDate('${s}')"` : ''}>${d}</div>`;
+    const disabled = s < tomorrowS;
+    const cls = ['dp-day', disabled ? 'dp-past' : '', s === selected ? 'dp-selected' : ''].filter(Boolean).join(' ');
+    cells += `<div class="${cls}" ${!disabled ? `onclick="selectDate('${s}')"` : ''}>${d}</div>`;
   }
 
   document.getElementById('dp-container').innerHTML = `
@@ -1578,7 +1672,72 @@ function selectAirport(fieldId, iata, city) {
   document.getElementById(fieldId + '-drop').style.display = 'none';
 }
 
+// ── Demo box ──────────────────────────────────────────────────────────────────
+const DEMO_ACCOUNTS = {
+  demo: [
+    { policy: 'POL-001-ACTIVE', email: 'sarah.johnson@example.com',  desc: 'AMT · couple' },
+    { policy: 'POL-002-ACTIVE', email: 'j.williams@example.com',     desc: 'Single trip' },
+    { policy: 'POL-003-ACTIVE', email: 'emma.davies@example.com',    desc: 'AMT · family' },
+    { policy: 'POL-004-ACTIVE', email: 'm.alhassan@example.com',     desc: 'AMT · couple' },
+    { policy: 'POL-005-ACTIVE', email: 'charlotte.baker@example.com',desc: 'Return trip · couple' },
+  ],
+  ergo: [
+    { policy: 'ERGO-AMT-2026-001', email: 'thomas.muller@ergo-demo.de',   desc: 'AMT · couple' },
+    { policy: 'ERGO-RET-2026-042', email: 'sophie.klein@ergo-demo.de',    desc: 'Return trip' },
+    { policy: 'ERGO-SGL-2026-117', email: 'lukas.becker@ergo-demo.de',    desc: 'Single trip · family' },
+  ],
+  staysure: [
+    { policy: 'SS-AMT-2026-3301', email: 'patricia.hughes@staysure-demo.co.uk', desc: 'AMT · couple' },
+    { policy: 'SS-RET-2026-8820', email: 'margaret.thornton@staysure-demo.co.uk', desc: 'Return trip · couple' },
+    { policy: 'SS-SGL-2026-5504', email: 'dorothy.pearson@staysure-demo.co.uk',  desc: 'Single trip' },
+  ],
+};
+
+function renderDemoBox() {
+  const slug     = state.tenant?.slug || 'demo';
+  const accounts = DEMO_ACCOUNTS[slug] || DEMO_ACCOUNTS.demo;
+  const rows = accounts.map(a => `
+    <tr>
+      <td class="demo-pol">${a.policy}</td>
+      <td class="demo-em">${a.email}</td>
+      <td class="demo-st">${a.desc}</td>
+      <td><button class="demo-login-btn" onclick="demoLogin('${a.policy}','${a.email}')">Use →</button></td>
+    </tr>`).join('');
+  const portalRows = accounts.map(a => `
+    <tr>
+      <td class="demo-pol">${a.policy}</td>
+      <td class="demo-em">${a.email}</td>
+      <td class="demo-st">${a.desc}</td>
+      <td><button class="demo-login-btn" onclick="portalDemoLogin('${a.policy}','${a.email}')">Use →</button></td>
+    </tr>`).join('');
+  const boxHtml = (rowsHtml) => `
+    <div class="demo-box">
+      <div class="demo-box-title">🧪 Demo test accounts</div>
+      <table class="demo-table">${rowsHtml}</table>
+      <div class="demo-footer">
+        Admin: <a href="/admin" style="color:var(--warn);font-weight:700">/admin</a> ·
+        superadmin: <code>admin / changeme</code>
+      </div>
+    </div>`;
+  const el = document.getElementById('demo-box');
+  if (el) el.innerHTML = boxHtml(rows);
+  const pel = document.getElementById('portal-demo-box');
+  if (pel) pel.innerHTML = boxHtml(portalRows);
+}
+
+function portalDemoLogin(policy, email) {
+  document.getElementById('portal-policy-input').value = policy;
+  document.getElementById('portal-email-input').value  = email;
+  portalLogin();
+}
+
 // ── Policy validation ─────────────────────────────────────────────────────────
+function demoLogin(policy, email) {
+  document.getElementById('policy-number').value = policy;
+  document.getElementById('policy-email').value  = email;
+  validatePolicy();
+}
+
 async function validatePolicy() {
   const policyNumber = document.getElementById('policy-number').value.trim();
   const email = document.getElementById('policy-email').value.trim();
@@ -1676,14 +1835,43 @@ function getSelectedTravelers() {
   });
 }
 
+// ── Pre-flight-lookup date validation (client-side, avoids unnecessary API calls) ──
+function checkDateBeforeApi(date) {
+  if (!date) return false;
+  const now = Date.now();
+  const depMs = new Date(`${date}T00:00:00`).getTime();
+  const hoursUntil = (depMs - now) / (1000 * 60 * 60);
+  const daysUntil  = hoursUntil / 24;
+
+  if (hoursUntil < state.minHoursBeforeDep) {
+    document.getElementById('too-soon-alert').style.display = 'flex';
+    return true;
+  }
+  if (daysUntil > state.maxDaysBeforeDep) {
+    showEl('too-far-alert', `This flight is too far in advance — you can only register flights up to ${state.maxDaysBeforeDep} days before departure.`);
+    return true;
+  }
+  const v = state.validated;
+  if (v?.coverStartDate && date < v.coverStartDate) {
+    showEl('outside-cover-alert', `This date (${fmtDate(date)}) is before your policy cover start date (${fmtDate(v.coverStartDate)}).`);
+    return true;
+  }
+  if (v?.coverEndDate && date > v.coverEndDate) {
+    showEl('outside-cover-alert', `This date (${fmtDate(date)}) is after your policy cover end date (${fmtDate(v.coverEndDate)}).`);
+    return true;
+  }
+  return false;
+}
+
 // ── Flight number search ──────────────────────────────────────────────────────
 async function searchFlight() {
   const flight = document.getElementById('flight-search').value.trim().toUpperCase();
   const date   = document.getElementById('fn-date-hidden').value;
-  hideEl('search-error'); hideEl('too-soon-alert');
+  hideEl('search-error'); hideEl('too-soon-alert'); hideEl('too-far-alert'); hideEl('outside-cover-alert');
   document.getElementById('flight-result').style.display = 'none';
 
   if (!flight || !date) { showEl('search-error', 'Please enter a flight number and select a date.'); return; }
+  if (checkDateBeforeApi(date)) return;
 
   const btn = document.getElementById('search-btn');
   btn.disabled = true; btn.textContent = 'Searching…';
@@ -1691,7 +1879,6 @@ async function searchFlight() {
     const res = await fetch(`/api/flight-lookup?flight=${encodeURIComponent(flight)}&date=${encodeURIComponent(date)}`, { headers: tenantHeader() });
     const data = await res.json();
     if (!data.found) { showEl('search-error', 'Flight not found. Please check the number and date.'); return; }
-    if (data.tooSoon) { document.getElementById('too-soon-alert').style.display = 'flex'; return; }
     renderFlightResults([data], date);
   } catch (_) {
     showEl('search-error', 'Unable to look up flight — please try again.');
@@ -1705,7 +1892,7 @@ async function searchRoute() {
   const origin      = document.getElementById('origin-iata').value;
   const destination = document.getElementById('destination-iata').value;
   const date        = document.getElementById('rt-date-hidden').value;
-  hideEl('search-error'); hideEl('too-soon-alert');
+  hideEl('search-error'); hideEl('too-soon-alert'); hideEl('too-far-alert'); hideEl('outside-cover-alert');
   document.getElementById('flight-result').style.display = 'none';
 
   if (!origin || !destination || !date) {
@@ -1713,6 +1900,7 @@ async function searchRoute() {
     return;
   }
   if (origin === destination) { showEl('search-error', 'Origin and destination must be different.'); return; }
+  if (checkDateBeforeApi(date)) return;
 
   const btn = document.getElementById('route-search-btn');
   btn.disabled = true; btn.textContent = 'Searching…';
@@ -1738,17 +1926,29 @@ function renderFlightResults(flights, date) {
 
   resultEl.innerHTML = flights.map(f => `
     <div class="flight-card">
-      <div class="flight-airline">${f.carrierCode}</div>
-      <div class="flight-info">
-        <div class="flight-route-display">
-          <span>${f.depIata || '?'}</span>
-          <span class="route-arrow">→</span>
-          <span>${f.arrIata || '?'}</span>
-          <span class="flight-num-badge">${f.number}</span>
-        </div>
-        <div class="flight-meta">${fmtDate(date)} &nbsp;·&nbsp; ${f.depTime || '—'} → ${f.arrTime || '—'}${f.duration ? ' &nbsp;·&nbsp; ' + f.duration : ''}</div>
+      <div class="flight-card-top">
+        <span class="flight-num-badge">${f.number}</span>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary btn-sm" onclick='addFlightToBasket(${JSON.stringify(f)}, "${date}")'>Add flight</button>
       </div>
-      <button class="btn btn-primary btn-sm" onclick='addFlightToBasket(${JSON.stringify(f)}, "${date}")'>Add</button>
+      <div class="flight-route-row">
+        <div class="flight-endpoint">
+          <div class="flight-iata">${f.depIata || '?'}</div>
+          <div class="flight-airport-name">${f.depName || ''}</div>
+        </div>
+        <div class="flight-route-connector">
+          <div class="conn-line"></div>
+        </div>
+        <div class="flight-endpoint arr">
+          <div class="flight-iata">${f.arrIata || '?'}</div>
+          <div class="flight-airport-name">${f.arrName || ''}</div>
+        </div>
+      </div>
+      <div class="flight-meta">
+        <span class="flight-meta-item">📅 ${fmtDate(date)}</span>
+        <span class="flight-meta-item">🕐 ${f.depTime || '—'} → ${f.arrTime || '—'}</span>
+        ${f.duration ? `<span class="flight-meta-item">⏱ ${f.duration}</span>` : ''}
+      </div>
     </div>
   `).join('');
 }
@@ -1764,14 +1964,29 @@ function addFlightToBasket(f, date) {
     showEl('search-error', 'Please select at least one traveler.');
     return;
   }
+
+  // Validate flight date against policy cover window
+  const v = state.validated;
+  if (v?.coverStartDate && date < v.coverStartDate) {
+    showEl('outside-cover-alert', `This flight date (${fmtDate(date)}) is before your policy cover start date (${fmtDate(v.coverStartDate)}).`);
+    return;
+  }
+  if (v?.coverEndDate && date > v.coverEndDate) {
+    showEl('outside-cover-alert', `This flight date (${fmtDate(date)}) is after your policy cover end date (${fmtDate(v.coverEndDate)}).`);
+    return;
+  }
+
   state.basket.push({
     flightNumber: f.number,
     carrierCode: f.carrierCode || f.carrier,
     depIata: f.depIata,
+    depName: f.depName || null,
     arrIata: f.arrIata,
+    arrName: f.arrName || null,
     depDate: date,
     scheduledDepTime: f.depTime,
     scheduledArrTime: f.arrTime,
+    duration: f.duration || null,
     travelers,
   });
   document.getElementById('flight-result').style.display = 'none';
@@ -1782,6 +1997,21 @@ function addFlightToBasket(f, date) {
 function removeFromBasket(idx) {
   state.basket.splice(idx, 1);
   renderBasket();
+}
+
+function tryProceedFromFlights() {
+  // Prompt to add a return flight whenever only 1 flight is in the basket
+  if (state.basket.length === 1) {
+    document.getElementById('return-flight-modal').style.display = 'flex';
+    return;
+  }
+  goStep(3);
+}
+
+function closeReturnModal(proceed) {
+  document.getElementById('return-flight-modal').style.display = 'none';
+  if (proceed) goStep(3);
+  // else stay on flight step to add return flight
 }
 
 function renderBasket() {
@@ -1798,7 +2028,8 @@ function renderBasket() {
     <div class="basket-item">
       <div style="flex:1">
         <div class="basket-route">${f.depIata || '?'} → ${f.arrIata || '?'} &nbsp; <span style="font-size:12px;font-weight:500;color:var(--brand-dark)">${f.flightNumber}</span></div>
-        <div class="basket-meta">${fmtDate(f.depDate)} · Dep ${f.scheduledDepTime || '—'}${tNames ? ` · ${tCount} traveler${tCount > 1 ? 's' : ''}: ${tNames}` : ''}</div>
+        ${f.depName || f.arrName ? `<div style="font-size:11px;color:var(--muted);margin-top:1px">${f.depName || f.depIata} → ${f.arrName || f.arrIata}</div>` : ''}
+        <div class="basket-meta">${fmtDate(f.depDate)}${f.scheduledDepTime ? ` · ${f.scheduledDepTime}` : ''}${f.scheduledArrTime ? ` → ${f.scheduledArrTime}` : ''}${f.duration ? ` · ${f.duration}` : ''}${tNames ? ` · ${tCount} traveler${tCount > 1 ? 's' : ''}: ${tNames}` : ''}</div>
       </div>
       <button class="btn-remove" onclick="removeFromBasket(${i})" title="Remove">✕</button>
     </div>
@@ -1823,15 +2054,34 @@ function buildReview() {
     <div class="summary-row"><span class="summary-label">Policy</span><span class="summary-value" style="font-family:monospace">${v.policyNumber}</span></div>
     <div class="summary-row"><span class="summary-label">Payout per person / flight</span><span class="summary-value" style="color:var(--success);font-size:16px;">£${Math.round(v.payoutPence / 100)}</span></div>
     <div class="summary-row"><span class="summary-label">Bank details</span><span class="summary-value">Sort: ${sc} &nbsp; Acc: ${'•'.repeat(4)}${ac.slice(-4)}</span></div>
-    <div class="summary-row">
-      <span class="summary-label">Flights</span>
-      <span class="summary-value" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
-        ${state.basket.map(f => {
+    <div style="margin-top:4px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Flights</div>
+      ${state.basket.map(f => {
         const tc = f.travelers?.length || 1;
         const tn = f.travelers?.map(t => t.firstName).join(', ') || '';
-        return `<span>${f.flightNumber} &nbsp; ${f.depIata} → ${f.arrIata} &nbsp; ${fmtDate(f.depDate)}${tn ? ` &nbsp; <span style="font-weight:400;color:var(--muted)">${tc} traveler${tc>1?'s':''}: ${tn}</span>` : ''}</span>`;
+        return `<div class="flight-card" style="margin-bottom:8px">
+          <div class="flight-card-top">
+            <span class="flight-num-badge">${f.flightNumber}</span>
+            ${tn ? `<span style="font-size:12px;color:var(--muted)">${tc} traveler${tc>1?'s':''}: ${tn}</span>` : ''}
+          </div>
+          <div class="flight-route-row">
+            <div class="flight-endpoint">
+              <div class="flight-iata">${f.depIata || '?'}</div>
+              <div class="flight-airport-name">${f.depName || ''}</div>
+            </div>
+            <div class="flight-route-connector"><div class="conn-line"></div></div>
+            <div class="flight-endpoint arr">
+              <div class="flight-iata">${f.arrIata || '?'}</div>
+              <div class="flight-airport-name">${f.arrName || ''}</div>
+            </div>
+          </div>
+          <div class="flight-meta">
+            <span class="flight-meta-item">📅 ${fmtDate(f.depDate)}</span>
+            <span class="flight-meta-item">🕐 ${f.scheduledDepTime || '—'} → ${f.scheduledArrTime || '—'}</span>
+            ${f.duration ? `<span class="flight-meta-item">⏱ ${f.duration}</span>` : ''}
+          </div>
+        </div>`;
       }).join('')}
-      </span>
     </div>
   `;
 }
@@ -1893,12 +2143,45 @@ function showSuccess(data) {
   state.registrationId = data.registrationId;
   document.getElementById('confirm-policy').textContent  = data.policyNumber;
   document.getElementById('confirm-email').textContent   = state.validated.email || document.getElementById('policy-email').value.trim();
-  document.getElementById('confirm-flights').innerHTML   = (data.flights || state.basket).map(f =>
-    `<div class="summary-row"><span class="summary-label">${f.flightNumber || f.flight_number}</span><span class="summary-value">${fmtDate(f.depDate || f.dep_date)}</span></div>`
-  ).join('');
+  document.getElementById('confirm-flights').innerHTML = state.basket.map(f => `
+    <div class="flight-card" style="margin-bottom:10px">
+      <div class="flight-card-top">
+        <span class="flight-num-badge">${f.flightNumber}</span>
+      </div>
+      <div class="flight-route-row">
+        <div class="flight-endpoint">
+          <div class="flight-iata">${f.depIata || '?'}</div>
+          <div class="flight-airport-name">${f.depName || ''}</div>
+        </div>
+        <div class="flight-route-connector"><div class="conn-line"></div></div>
+        <div class="flight-endpoint arr">
+          <div class="flight-iata">${f.arrIata || '?'}</div>
+          <div class="flight-airport-name">${f.arrName || ''}</div>
+        </div>
+      </div>
+      <div class="flight-meta">
+        <span class="flight-meta-item">📅 ${fmtDate(f.depDate)}</span>
+        <span class="flight-meta-item">🕐 ${f.scheduledDepTime || '—'} → ${f.scheduledArrTime || '—'}</span>
+        ${f.duration ? `<span class="flight-meta-item">⏱ ${f.duration}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
   document.getElementById('upload-list').innerHTML = '';
   document.getElementById('upload-error').style.display = 'none';
+
+  const isAmt = state.validated?.policyType === 'annual_multi_trip';
+  document.getElementById('add-another-btn').style.display = isAmt ? '' : 'none';
+  document.getElementById('amt-hint').style.display = isAmt ? '' : 'none';
+
   showStep(5);
+}
+
+function addAnotherFlight() {
+  // Clear basket and go back to flight search, keeping validated policy data
+  state.basket = [];
+  renderBasket();
+  showStep(3);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ── Document upload ────────────────────────────────────────────────────────────
@@ -2036,7 +2319,39 @@ function hexWithAlpha(hex, alpha) {
 
 // ── Customer Portal ────────────────────────────────────────────────────────────
 
-const portalState = { token: null, registrationId: null };
+const portalState = { token: null, registrationId: null, loggedOut: false };
+
+function portalStorageKey() {
+  return `cp_${state.tenant?.slug || 'default'}`;
+}
+
+function portalSaveSession(token, registrationId) {
+  portalState.token          = token;
+  portalState.registrationId = registrationId;
+  try {
+    localStorage.setItem(portalStorageKey(), JSON.stringify({ token, registrationId }));
+  } catch (_) {}
+}
+
+function portalClearSession() {
+  portalState.token = null;
+  portalState.registrationId = null;
+  portalState.loggedOut = true;
+  try { localStorage.removeItem(portalStorageKey()); } catch (_) {}
+}
+
+function portalRestoreSession() {
+  if (portalState.token) return true;
+  try {
+    const raw = localStorage.getItem(portalStorageKey());
+    if (!raw) return false;
+    const { token, registrationId } = JSON.parse(raw);
+    if (!token) return false;
+    portalState.token          = token;
+    portalState.registrationId = registrationId;
+    return true;
+  } catch (_) { return false; }
+}
 
 function togglePortal() {
   const isOpen = document.getElementById('portal-view').style.display !== 'none';
@@ -2047,15 +2362,37 @@ function togglePortal() {
   }
 }
 
-function showPortal() {
+async function showPortal() {
   document.getElementById('portal-view').style.display = '';
   document.querySelector('main').style.display = 'none';
   document.getElementById('stepper').style.display = 'none';
   document.getElementById('portal-toggle-btn').textContent = '← Back';
 
+  // Restore saved session from localStorage (survives page reloads)
+  portalRestoreSession();
+
   if (portalState.token) {
     document.getElementById('portal-login').style.display = 'none';
     showPortalDash();
+  } else if (!portalState.loggedOut && state.validated?.policyNumber && state.validated?.email) {
+    // Already validated in this session — auto-login without showing the form
+    document.getElementById('portal-login').style.display = 'none';
+    document.getElementById('portal-dash').style.display = 'none';
+    try {
+      const res  = await fetch('/api/customer/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...tenantHeader() },
+        body: JSON.stringify({ policy_number: state.validated.policyNumber, email: state.validated.email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        portalSaveSession(data.token, data.registrationId);
+        showPortalDash();
+        return;
+      }
+    } catch (_) {}
+    // Fallback to login form if auto-login fails
+    document.getElementById('portal-login').style.display = '';
   } else {
     document.getElementById('portal-login').style.display = '';
     document.getElementById('portal-dash').style.display = 'none';
@@ -2066,17 +2403,17 @@ function hidePortal() {
   document.getElementById('portal-view').style.display = 'none';
   document.querySelector('main').style.display = '';
   if (state.step > 1) document.getElementById('stepper').style.display = 'flex';
-  document.getElementById('portal-toggle-btn').textContent = 'My Flights';
+  document.getElementById('portal-toggle-btn').textContent = state.tenant?.portalLabel || 'My Account';
 }
 
 function portalLogout() {
-  portalState.token = null;
-  portalState.registrationId = null;
+  portalClearSession();
   document.getElementById('portal-dash').style.display = 'none';
   document.getElementById('portal-login').style.display = '';
   document.getElementById('portal-policy-input').value = '';
   document.getElementById('portal-email-input').value = '';
   document.getElementById('portal-login-error').style.display = 'none';
+  resetApp(); // wipe all personal data — clicking "← Back" now shows a clean step 1
 }
 
 async function portalLogin() {
@@ -2105,17 +2442,17 @@ async function portalLogin() {
     if (!res.ok) {
       errEl.textContent = data.error || 'Login failed';
       errEl.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'View my flights';
+      btn.disabled = false; btn.textContent = 'Continue →';
       return;
     }
-    portalState.token          = data.token;
-    portalState.registrationId = data.registrationId;
+    portalState.loggedOut = false;
+    portalSaveSession(data.token, data.registrationId);
     document.getElementById('portal-login').style.display = 'none';
     showPortalDash();
   } catch (_) {
     errEl.textContent = 'Network error — please try again.';
     errEl.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'View my flights';
+    btn.disabled = false; btn.textContent = 'Continue →';
   }
 }
 
@@ -2130,6 +2467,13 @@ async function showPortalDash() {
     });
     const data = await res.json();
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        // Token expired or invalid — clear it and show login form
+        portalClearSession();
+        document.getElementById('portal-dash').style.display = 'none';
+        document.getElementById('portal-login').style.display = '';
+        return;
+      }
       document.getElementById('portal-flights-list').innerHTML =
         `<div class="alert alert-error">${data.error}</div>`;
       return;
@@ -2142,6 +2486,10 @@ async function showPortalDash() {
 }
 
 function renderPortalDash(reg) {
+  // Hide the "Add a flight" button for policy-only sessions (no registration row)
+  const addBtn = document.getElementById('portal-add-toggle-btn');
+  if (addBtn) addBtn.style.display = reg.id ? '' : 'none';
+
   document.getElementById('portal-reg-summary').innerHTML = `
     <div class="portal-summary-card">
       <div class="portal-summary-row">
@@ -2164,10 +2512,22 @@ function renderPortalDash(reg) {
     </div>`;
 
   if (!reg.flights || reg.flights.length === 0) {
-    document.getElementById('portal-flights-list').innerHTML =
-      '<p style="color:var(--muted);text-align:center;padding:24px">No flights registered yet.</p>';
+    document.getElementById('portal-flights-list').innerHTML = `
+      <div style="text-align:center;padding:32px 24px;">
+        <div style="font-size:40px;margin-bottom:12px">✈️</div>
+        <div style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:8px">No flights registered yet</div>
+        <p style="font-size:14px;color:var(--muted);margin-bottom:20px">
+          Use the registration form to add flights to your policy and activate your automatic delay protection.
+        </p>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <button class="btn btn-outline" onclick="hidePortal()">Register a flight →</button>
+        <button class="btn btn-outline" onclick="portalLogout()">Log out</button>
+      </div>`;
+    document.getElementById('portal-add-toggle-btn').closest('div').style.display = 'none';
     return;
   }
+  document.getElementById('portal-add-toggle-btn').closest('div').style.display = '';
 
   document.getElementById('portal-flights-list').innerHTML =
     reg.flights.map(f => renderPortalFlightCard(f, reg)).join('');
@@ -2440,6 +2800,10 @@ async function portalSearchNewFlight() {
       errEl.textContent = 'This flight is too close to departure and cannot be registered.';
       errEl.style.display = 'block'; return;
     }
+    if (data.tooFar) {
+      errEl.textContent = `This flight is too far in advance — you can only register up to ${state.maxDaysBeforeDep} days before departure.`;
+      errEl.style.display = 'block'; return;
+    }
     // Render result card
     const route = [data.depIata, data.arrIata].filter(Boolean).join(' → ') || '';
     resEl.innerHTML = `
@@ -2519,5 +2883,18 @@ async function portalDeleteFlight(flightId) {
   }
 }
 </script>
+
+<!-- Return flight modal -->
+<div id="return-flight-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:14px;padding:32px;max-width:420px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+    <div style="font-size:32px;text-align:center;margin-bottom:12px">✈</div>
+    <div style="font-size:20px;font-weight:800;color:#1a1a2e;text-align:center;margin-bottom:8px">Add your return flight?</div>
+    <div style="font-size:14px;color:#6b7280;text-align:center;margin-bottom:24px;line-height:1.5">
+      You've added your outbound flight. Would you like to add your return flight too? Both legs are covered under your policy.
+    </div>
+    <button class="btn btn-primary btn-full" onclick="closeReturnModal(false)" style="margin-bottom:10px">Yes, add my return flight</button>
+    <button class="btn btn-outline btn-full" onclick="closeReturnModal(true)">No thanks, continue to payment</button>
+  </div>
+</div>
 </body>
 </html>

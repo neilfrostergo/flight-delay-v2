@@ -56,6 +56,9 @@ const config = {
   baseDomain: optionalEnv('BASE_DOMAIN', 'localhost'),
   devTenantSlug: optionalEnv('DEV_TENANT_SLUG', 'demo'),
 
+  // Dev email override — if set, ALL outbound emails go here instead of the real recipient
+  devEmailOverride: optionalEnv('DEV_EMAIL_OVERRIDE', ''),
+
   smtp: {
     host: optionalEnv('SMTP_HOST', 'sandbox.smtp.mailtrap.io'),
     port: parseInt(optionalEnv('SMTP_PORT', '2525'), 10),

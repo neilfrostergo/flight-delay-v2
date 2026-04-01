@@ -19,8 +19,10 @@ router.get('/', (req, res) => {
     primaryColour: req.tenant.primary_colour,
     termsUrl:      req.tenant.terms_url,
     supportEmail:  req.tenant.support_email,
+    portalLabel:   req.tenant.portal_label || 'My Account',
     // Operational config the customer SPA needs
     minHoursBeforeDep: req.tenant.min_hours_before_dep,
+    maxDaysBeforeDep:  req.tenant.max_days_before_dep || 40,
   });
 });
 
