@@ -12,8 +12,9 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY server/ ./
-COPY customer/ ./public/customer/
-COPY admin/ ./public/admin/
+COPY customer/ ../customer/
+COPY admin/ ../admin/
+COPY landing/ ../landing/
 
 ENV NODE_ENV=production
 ENV PORT=3000
