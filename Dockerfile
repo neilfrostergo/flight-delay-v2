@@ -1,12 +1,12 @@
 # ── Build stage ──────────────────────────────────────────────
-FROM --platform=linux/amd64 node:20-alpine AS deps
+FROM node:20-slim AS deps
 
 WORKDIR /app
 COPY server/package*.json ./
 RUN npm ci --omit=dev
 
 # ── Production image ─────────────────────────────────────────
-FROM --platform=linux/amd64 node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
