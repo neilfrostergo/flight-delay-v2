@@ -38,14 +38,14 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Log in to ACR
+        run: az acr login --name fdv2acr
+
       - name: Build and push image to ACR
         run: |
-          az acr build \
-            --registry fdv2acr \
-            --image fdv2-app:${{ github.sha }} \
-            --image fdv2-app:latest \
-            --platform linux/amd64 \
-            .
+          docker build -t fdv2acr.azurecr.io/fdv2-app:${{ github.sha }} -t fdv2acr.azurecr.io/fdv2-app:latest .
+          docker push fdv2acr.azurecr.io/fdv2-app:${{ github.sha }}
+          docker push fdv2acr.azurecr.io/fdv2-app:latest
 
       - name: Deploy to Container Apps
         run: |
