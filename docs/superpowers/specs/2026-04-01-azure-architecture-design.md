@@ -25,8 +25,8 @@ All inbound traffic enters through **Azure Front Door Premium**, which provides 
 
 - Global anycast CDN with WAF (OWASP 3.2 ruleset), rate limiting, geo-restriction (UK focus), bot protection
 - DDoS Standard protection included
-- Custom domains: `*.platform.co.uk` wildcard CNAME → Front Door; automatic TLS cert renewal
-- Azure DNS: Wildcard `*.platform.co.uk` CNAME record pointing to the Front Door endpoint
+- Custom domains: `*.delayedpaid.co.uk` wildcard CNAME → Front Door; automatic TLS cert renewal
+- Azure DNS: Wildcard `*.delayedpaid.co.uk` CNAME record pointing to the Front Door endpoint
 - Private Link origin — no public IP on the Container Apps environment
 
 ### VNet — 10.100.0.0/16 (UK South)
