@@ -35,6 +35,8 @@ const tenantSchema = Joi.object({
   is_active:               Joi.boolean().optional(),
 });
 
+const RESERVED_SLUGS = ['uat', 'www', 'api', 'admin', 'health', 'mail', 'smtp', 'staging', 'dev', 'test'];
+
 // GET /api/admin/tenants
 router.get('/', async (_req, res) => {
   const result = await query(
@@ -80,6 +82,10 @@ router.get('/:id/stats', async (req, res) => {
 router.post('/', async (req, res) => {
   const { error, value } = tenantSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.details[0].message });
+
+  if (RESERVED_SLUGS.includes(value.slug)) {
+    return res.status(400).json({ error: `Slug "${value.slug}" is reserved and cannot be used` });
+  }
 
   const result = await query(
     `INSERT INTO tenants
