@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Delay v2 — Development Workflow</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --bg2:       #161b22;
+    --bg3:       #21262d;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --text-muted:#8b949e;
+    --blue:      #58a6ff;
+    --green:     #3fb950;
+    --yellow:    #d29922;
+    --red:       #f85149;
+    --purple:    #bc8cff;
+    --orange:    #e3b341;
+    --accent:    #1f6feb;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 44px; left: 0;
+    width: 220px;
+    height: calc(100vh - 44px);
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 0;
+    z-index: 100;
+  }
+
+  .sidebar-logo {
+    padding: 0 16px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+
+  .sidebar-logo .product {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .sidebar-logo .doc-type {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .sidebar nav a {
+    display: block;
+    padding: 6px 16px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .sidebar nav a:hover,
+  .sidebar nav a.active {
+    color: var(--blue);
+    border-left-color: var(--blue);
+    background: rgba(88,166,255,0.06);
+  }
+
+  .sidebar nav .section-label {
+    padding: 14px 16px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  main {
+    margin-left: 220px;
+    padding: 80px 56px 48px;
+    max-width: 1200px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--blue);
+    margin: 28px 0 10px;
+  }
+
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 20px 0 8px;
+  }
+
+  p { margin-bottom: 12px; color: var(--text); }
+
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--orange);
+  }
+
+  pre {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 12px 0 20px;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-blue   { background: rgba(88,166,255,0.15);   color: var(--blue);   }
+  .badge-green  { background: rgba(63,185,80,0.15);    color: var(--green);  }
+  .badge-yellow { background: rgba(210,153,34,0.15);   color: var(--yellow); }
+  .badge-purple { background: rgba(188,140,255,0.15);  color: var(--purple); }
+
+  .table-wrap { overflow-x: auto; margin-bottom: 24px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  th {
+    background: var(--bg3);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .diagram-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px 0 32px;
+    overflow-x: auto;
+  }
+
+  svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  .steps { list-style: none; counter-reset: step; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 12px 16px 12px 52px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px; height: 24px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 24px;
+    text-align: center;
+  }
+
+  .callout {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 12px 0 20px;
+    font-size: 13px;
+    border-left: 3px solid;
+  }
+  .callout-info    { background: rgba(88,166,255,0.08);   border-color: var(--blue);   color: var(--text); }
+  .callout-warning { background: rgba(210,153,34,0.1);    border-color: var(--yellow); color: var(--text); }
+  .callout-success { background: rgba(63,185,80,0.08);    border-color: var(--green);  color: var(--text); }
+
+  .page-header {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .meta-row span { display: flex; align-items: center; gap: 6px; }
+
+  section { scroll-margin-top: 24px; }
+
+  /* Flow diagram boxes */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 20px 0 28px;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow {
+    color: var(--text-muted);
+    font-size: 18px;
+    padding: 0 8px;
+  }
+  .flow-step.dev    { border-color: var(--purple); color: var(--purple); }
+  .flow-step.uat    { border-color: var(--green);  color: var(--green);  }
+  .flow-step.prod   { border-color: var(--blue);   color: var(--blue);   }
+  .flow-step.action { border-color: var(--text-muted); color: var(--text); }
+
+  section { scroll-margin-top: 68px; }
+
+  /* ── Top navigation bar ── */
+  .topnav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 200;
+  }
+  .topnav-brand {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+    margin-right: 24px;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .topnav-links { display: flex; gap: 2px; flex: 1; }
+  .topnav-links a {
+    padding: 4px 10px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .topnav-links a:hover, .topnav-links a.current { color: var(--text); background: rgba(255,255,255,0.06); }
+  .topnav-links a.current { color: var(--blue); }
+  .topnav-print {
+    margin-left: auto;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .topnav-print:hover { background: #388bfd; }
+
+  @media print {
+    .topnav  { display: none !important; }
+    .sidebar { display: none !important; }
+    main { margin-left: 0 !important; padding: 24px 32px !important; max-width: 100% !important; }
+    body { background: #fff !important; }
+    h1, h2, h3, h4, p, td, li { color: #1a1a2e !important; }
+    h3 { color: #1f6feb !important; }
+    h2 { border-bottom-color: #ddd !important; }
+    code { background: #f6f8fa !important; border-color: #ddd !important; color: #c7254e !important; }
+    pre { background: #f6f8fa !important; border-color: #ddd !important; }
+    pre code { color: #333 !important; }
+    th { background: #f6f8fa !important; color: #555 !important; }
+    td { border-bottom-color: #eee !important; }
+    .stat-card, .card, .diagram-wrap { background: #f6f8fa !important; border-color: #ddd !important; }
+    .callout-info    { background: #e8f4fd !important; border-color: #1f6feb !important; }
+    .callout-warning { background: #fffbeb !important; border-color: #d29922 !important; }
+    .callout-success { background: #f0fdf4 !important; border-color: #3fb950 !important; }
+    .steps li { background: #f6f8fa !important; border-color: #ddd !important; }
+    .steps li::before { background: #1f6feb !important; }
+    a { color: #1f6feb !important; }
+    .page-header { border-bottom-color: #ddd !important; }
+    .meta-row { color: #555 !important; }
+    .flow-step { background: #f6f8fa !important; border-color: #ddd !important; color: #1a1a2e !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <a class="topnav-brand" href="index.html">Flight Delay v2</a>
+  <div class="topnav-links">
+    <a href="index.html">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="environments.html">Environments</a>
+    <a href="development.html" class="current">Development</a>
+  </div>
+  <button class="topnav-print" onclick="window.print()">Save as PDF</button>
+</div>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="product">Flight Delay v2</div>
+    <div class="doc-type">Development Workflow</div>
+  </div>
+  <nav>
+    <div class="section-label">Getting Started</div>
+    <a href="#overview">Workflow Overview</a>
+    <a href="#local-setup">Local Setup</a>
+
+    <div class="section-label">Day-to-Day</div>
+    <a href="#making-changes">Making Changes</a>
+    <a href="#local-testing">Testing Locally</a>
+    <a href="#raising-pr">Raising a PR</a>
+
+    <div class="section-label">Deployment</div>
+    <a href="#uat">UAT Deployment</a>
+    <a href="#production">Production Deployment</a>
+    <a href="#hotfix">Hotfixes</a>
+
+    <div class="section-label">Reference</div>
+    <a href="#branches">Branch Conventions</a>
+    <a href="#commands">Useful Commands</a>
+  </nav>
+</aside>
+
+<main>
+
+  <div class="page-header">
+    <h1>Flight Delay v2 — Development Workflow</h1>
+    <div class="meta-row">
+      <span>Branching: <strong>Git Flow</strong></span>
+      <span>Local dev: <strong>Docker Compose</strong></span>
+      <span>Last updated: <strong>2026-04-02</strong></span>
+      <span><span class="badge badge-yellow">Internal use only</span></span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 1. OVERVIEW ═══════════════════ -->
+  <section id="overview">
+    <h2>1. Workflow Overview</h2>
+
+    <p>
+      All changes follow the same path: develop locally → test in browser → raise a Pull Request →
+      merge to <code>develop</code> (auto-deploys to UAT) → test in UAT → merge to <code>main</code>
+      (auto-deploys to production). Nothing reaches production without passing through UAT first.
+    </p>
+
+    <div class="flow">
+      <div class="flow-step dev">1. Feature branch</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step action">2. Test locally</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step action">3. PR → develop</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step uat">4. UAT (auto)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step action">5. PR → main</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step prod">6. Production (auto)</div>
+    </div>
+
+    <div class="card-grid">
+      <div class="stat-card">
+        <div class="label">Feature branch</div>
+        <div class="value">feature/my-change</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">UAT branch</div>
+        <div class="value">develop</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Production branch</div>
+        <div class="value">main</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Deploy time</div>
+        <div class="value">~3 minutes</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 2. LOCAL SETUP ═══════════════════ -->
+  <section id="local-setup">
+    <h2>2. Local Setup</h2>
+
+    <p>One-time setup to get the development environment running on your machine.</p>
+
+    <h3>Prerequisites</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Tool</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Docker Desktop</td><td>Runs the app and database locally</td></tr>
+          <tr><td>Git</td><td>Version control</td></tr>
+          <tr><td>GitHub CLI (<code>gh</code>)</td><td>Creating pull requests from the terminal</td></tr>
+          <tr><td>Azure CLI (<code>az</code>)</td><td>Managing UAT and production infrastructure</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>First-time setup</h3>
+    <pre><code># 1. Copy the environment file
+cp server/.env.example server/.env
+
+# 2. Edit server/.env — fill in DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY
+#    Generate secrets:
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"  # JWT_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # ENCRYPTION_KEY
+
+# 3. Start the database
+docker compose up db -d
+
+# 4. Run database migrations
+docker compose run --rm app npm run migrate
+
+# 5. Seed the superadmin user (set ADMIN_SEED_PASSWORD in .env first)
+docker compose run --rm app npm run seed:admin
+
+# 6. Start the full app
+docker compose up</code></pre>
+
+    <p>The app will be available at <code>http://localhost:3000</code> (customer portal) and <code>http://localhost:3000/admin</code> (admin panel).</p>
+
+    <div class="callout callout-info">
+      In development, pass the <code>X-Tenant-Slug: demo</code> header to target the demo tenant — there are no real subdomains locally. Use the <strong>ModHeader</strong> browser extension to set this header automatically.
+    </div>
+
+    <h3>Wipe and reset</h3>
+    <pre><code>docker compose down -v   # destroys the database volume
+docker compose up db -d
+docker compose run --rm app npm run migrate
+docker compose run --rm app npm run seed:admin
+docker compose up</code></pre>
+  </section>
+
+  <!-- ═══════════════════ 3. MAKING CHANGES ═══════════════════ -->
+  <section id="making-changes">
+    <h2>3. Making Changes</h2>
+
+    <p>
+      Every change — no matter how small — starts on a <code>feature/*</code> branch. Never commit
+      directly to <code>develop</code> or <code>main</code>.
+    </p>
+
+    <h3>Start a new feature branch</h3>
+    <p>Always branch from <code>develop</code> (not <code>main</code>):</p>
+    <pre><code>git checkout develop
+git pull origin develop
+git checkout -b feature/my-change-description</code></pre>
+
+    <h3>Branch naming</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Type</th><th>Pattern</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>New feature</td><td><code>feature/&lt;description&gt;</code></td><td><code>feature/ergo-privacy-link</code></td></tr>
+          <tr><td>Bug fix</td><td><code>fix/&lt;description&gt;</code></td><td><code>fix/email-override-not-applying</code></td></tr>
+          <tr><td>Hotfix (prod)</td><td><code>hotfix/&lt;description&gt;</code></td><td><code>hotfix/payment-retry-crash</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warning">
+      Always run <code>git pull origin develop</code> before creating a new branch to make sure you're working from the latest code.
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 4. LOCAL TESTING ═══════════════════ -->
+  <section id="local-testing">
+    <h2>4. Testing Locally</h2>
+
+    <p>Test every change in Docker Compose before raising a PR. This is the fastest feedback loop — no waiting for deployments.</p>
+
+    <pre><code>docker compose up</code></pre>
+
+    <p>If you've changed server code, Docker Compose will hot-reload automatically. If you've changed the <code>Dockerfile</code> or <code>package.json</code>, rebuild first:</p>
+
+    <pre><code>docker compose up --build</code></pre>
+
+    <h3>What to check</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Change type</th><th>What to verify</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Customer SPA changes</td>
+            <td><code>http://localhost:3000</code> with <code>X-Tenant-Slug: demo</code> header</td>
+          </tr>
+          <tr>
+            <td>Admin SPA changes</td>
+            <td><code>http://localhost:3000/admin</code> — log in as superadmin</td>
+          </tr>
+          <tr>
+            <td>API / server changes</td>
+            <td>Run through the affected flow in the browser or use <code>curl</code></td>
+          </tr>
+          <tr>
+            <td>Database migrations</td>
+            <td><code>docker compose run --rm app npm run migrate</code> — confirm it runs without error</td>
+          </tr>
+          <tr>
+            <td>Email changes</td>
+            <td>Check Mailtrap inbox — all local emails are caught there</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-success">
+      Happy with it locally? You're ready to raise a PR.
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 5. RAISING A PR ═══════════════════ -->
+  <section id="raising-pr">
+    <h2>5. Raising a Pull Request</h2>
+
+    <p>When local testing is done, commit your changes and raise a PR to <code>develop</code>.</p>
+
+    <h3>Commit and push</h3>
+    <pre><code>git add &lt;files&gt;
+git commit -m "feat: describe what changed"
+git push origin feature/my-change-description</code></pre>
+
+    <h3>Create the PR</h3>
+    <pre><code>gh pr create \
+  --base develop \
+  --head feature/my-change-description \
+  --title "Short description of change" \
+  --body "What changed and why"</code></pre>
+
+    <p>This outputs a GitHub URL — open it to review the diff. When you're satisfied, click <strong>Merge</strong> on GitHub.</p>
+
+    <div class="callout callout-info">
+      Merging to <code>develop</code> triggers an automatic UAT deployment (~3 minutes). You don't need to do anything else.
+    </div>
+
+    <h3>Commit message conventions</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Prefix</th><th>Use for</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>feat:</code></td><td>New feature or change</td><td><code>feat: add privacy policy link</code></td></tr>
+          <tr><td><code>fix:</code></td><td>Bug fix</td><td><code>fix: trust proxy for rate limiting</code></td></tr>
+          <tr><td><code>chore:</code></td><td>Config, deps, tooling</td><td><code>chore: update node dependencies</code></td></tr>
+          <tr><td><code>docs:</code></td><td>Documentation only</td><td><code>docs: add development workflow guide</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 6. UAT ═══════════════════ -->
+  <section id="uat">
+    <h2>6. UAT Deployment</h2>
+
+    <p>
+      UAT deploys automatically when a PR is merged to <code>develop</code>. GitHub Actions builds
+      a new Docker image, pushes it to <code>fdv2acr</code>, and updates <code>fdv2-uat-app</code>.
+      The whole process takes about 3 minutes.
+    </p>
+
+    <h3>Accessing UAT</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Method</th><th>URL</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Via domain (once live)</td>
+            <td><code>https://demo.uat.delayedpaid.co.uk</code></td>
+          </tr>
+          <tr>
+            <td>Direct ACA URL (always works)</td>
+            <td><code>https://fdv2-uat-app.blackdesert-d8445a44.uksouth.azurecontainerapps.io</code> with <code>X-Tenant-Slug: demo</code> header</td>
+          </tr>
+          <tr>
+            <td>Admin panel</td>
+            <td>Append <code>/admin</code> to either URL above</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>UAT smoke test checklist</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Check</th><th>Expected</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Yellow UAT banner visible</td><td>"⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS" at top of page</td></tr>
+          <tr><td>Customer registration flow</td><td>All 6 steps complete without error</td></tr>
+          <tr><td>Policy validation</td><td>Stub returns mock data — no real Ergo Connect call</td></tr>
+          <tr><td>Confirmation email</td><td>Lands in Mailtrap inbox, not a real customer address</td></tr>
+          <tr><td>Admin panel login</td><td>Superadmin can log in and see the registration</td></tr>
+          <tr><td>Your specific change</td><td>Verify whatever you changed works as expected</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warning">
+      UAT uses real SMTP (Mailtrap) but <code>DEV_EMAIL_OVERRIDE</code> redirects all emails to the internal test inbox. No real customer will ever receive a UAT email.
+    </div>
+
+    <h3>Check deployment status</h3>
+    <pre><code>az containerapp revision list \
+  --name fdv2-uat-app \
+  --resource-group fdv2-uat-rg \
+  --query "[0].{revision:name,status:properties.healthState}" -o table</code></pre>
+  </section>
+
+  <!-- ═══════════════════ 7. PRODUCTION ═══════════════════ -->
+  <section id="production">
+    <h2>7. Production Deployment</h2>
+
+    <p>
+      Production is updated by merging <code>develop</code> into <code>main</code>. This is a
+      deliberate manual step — UAT sign-off required before promoting.
+    </p>
+
+    <ol class="steps">
+      <li>UAT testing complete and you're satisfied with the change</li>
+      <li>Raise a PR on GitHub: <strong>develop → main</strong>
+        <pre style="margin-top:8px"><code>gh pr create \
+  --base main \
+  --head develop \
+  --title "Release: describe what's going to production" \
+  --body "UAT sign-off complete. Changes: ..."</code></pre>
+      </li>
+      <li>Review the diff on GitHub — confirm only intended changes are included</li>
+      <li>Merge the PR</li>
+      <li>GitHub Actions deploys to production automatically (~3 minutes)</li>
+      <li>Verify at <code>https://admin.delayedpaid.co.uk</code></li>
+    </ol>
+
+    <div class="callout callout-warning">
+      <strong>Never merge directly to <code>main</code></strong> without UAT sign-off — except genuine hotfixes where the risk of the live bug outweighs the testing gap.
+    </div>
+
+    <h3>Check deployment status</h3>
+    <pre><code>az containerapp revision list \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --query "[0].{revision:name,status:properties.healthState}" -o table</code></pre>
+  </section>
+
+  <!-- ═══════════════════ 8. HOTFIXES ═══════════════════ -->
+  <section id="hotfix">
+    <h2>8. Hotfixes</h2>
+
+    <p>
+      For urgent bugs in production that can't wait for a full UAT cycle, branch directly from
+      <code>main</code>, fix, and merge back to <code>main</code>. Then immediately backport to
+      <code>develop</code> to keep branches in sync.
+    </p>
+
+    <pre><code># 1. Branch from main
+git checkout main
+git pull origin main
+git checkout -b hotfix/describe-the-fix
+
+# 2. Make the fix, commit
+git add &lt;files&gt;
+git commit -m "fix: describe the fix"
+git push origin hotfix/describe-the-fix
+
+# 3. PR hotfix → main (deploys to production)
+gh pr create --base main --head hotfix/describe-the-fix --title "Hotfix: ..."
+
+# 4. After merging to main, ALSO merge to develop
+gh pr create --base develop --head hotfix/describe-the-fix --title "Backport: ..."</code></pre>
+
+    <div class="callout callout-warning">
+      Always backport hotfixes to <code>develop</code>. If you don't, the fix will be overwritten the next time <code>develop</code> is promoted to <code>main</code>.
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 9. BRANCH CONVENTIONS ═══════════════════ -->
+  <section id="branches">
+    <h2>9. Branch Conventions</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Branch</th><th>Purpose</th><th>Deploys to</th><th>Who merges</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>main</code></td>
+            <td>Production-ready code</td>
+            <td>Production (auto)</td>
+            <td>You — after UAT sign-off</td>
+          </tr>
+          <tr>
+            <td><code>develop</code></td>
+            <td>Integration branch — latest tested changes</td>
+            <td>UAT (auto)</td>
+            <td>You — after local testing</td>
+          </tr>
+          <tr>
+            <td><code>feature/*</code></td>
+            <td>Individual changes in progress</td>
+            <td>Nowhere (local only)</td>
+            <td>You — via PR to develop</td>
+          </tr>
+          <tr>
+            <td><code>hotfix/*</code></td>
+            <td>Urgent production fixes</td>
+            <td>Production (via main)</td>
+            <td>You — via PR to main + backport to develop</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-info">
+      <strong>Rule of thumb:</strong> <code>main</code> is always deployable. <code>develop</code> is always UAT-tested. Feature branches are works in progress.
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 10. USEFUL COMMANDS ═══════════════════ -->
+  <section id="commands">
+    <h2>10. Useful Commands</h2>
+
+    <h3>Local development</h3>
+    <pre><code>docker compose up              # Start app + database
+docker compose up --build      # Rebuild image first (after Dockerfile/package.json changes)
+docker compose up db -d        # Start database only (background)
+docker compose down            # Stop everything
+docker compose down -v         # Stop and wipe database</code></pre>
+
+    <h3>Database</h3>
+    <pre><code>docker compose run --rm app npm run migrate     # Run migrations
+docker compose run --rm app npm run seed:admin  # Seed superadmin user</code></pre>
+
+    <h3>Git</h3>
+    <pre><code>git checkout develop && git pull origin develop          # Get latest develop
+git checkout -b feature/my-change                        # New feature branch
+git add &lt;files&gt; && git commit -m "feat: ..."            # Commit
+git push origin feature/my-change                       # Push branch</code></pre>
+
+    <h3>Pull requests</h3>
+    <pre><code># Feature → UAT
+gh pr create --base develop --head feature/my-change --title "..." --body "..."
+
+# UAT → Production
+gh pr create --base main --head develop --title "Release: ..." --body "..."
+
+# View open PRs
+gh pr list</code></pre>
+
+    <h3>UAT operations</h3>
+    <pre><code># View live logs
+az containerapp logs show --name fdv2-uat-app --resource-group fdv2-uat-rg --tail 50
+
+# Check current revision
+az containerapp revision list --name fdv2-uat-app --resource-group fdv2-uat-rg --query "[0].name" -o tsv
+
+# Force new revision (picks up Key Vault secret changes)
+az containerapp update --name fdv2-uat-app --resource-group fdv2-uat-rg --set-env-vars NODE_ENV=uat</code></pre>
+
+    <h3>Production operations</h3>
+    <pre><code># View live logs
+az containerapp logs show --name fdv2-app --resource-group fdv2-prod-rg --tail 50
+
+# Check current revision
+az containerapp revision list --name fdv2-app --resource-group fdv2-prod-rg --query "[0].name" -o tsv</code></pre>
+  </section>
+
+</main>
+
+</body>
+</html>

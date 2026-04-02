@@ -736,12 +736,12 @@
       <input id="tm-register-claim-url" placeholder="https://…/register" />
       <small>URL for the "Register your claim online" button in customer emails. Leave blank to hide.</small>
     </div>
-    <div class="form-group"><label>Policy API URL</label>
-      <input id="tm-policy-url" placeholder="https://ergoconnectwebapi.azurewebsites.net" onchange="clearCoverholderDropdown()" />
-    </div>
-    <div class="form-group"><label>Policy API Key</label>
-      <input id="tm-policy-key" type="password" placeholder="Leave blank to keep existing" onchange="clearCoverholderDropdown()" />
-      <small>Stored encrypted.</small>
+    <div class="form-group">
+      <label>Policy API</label>
+      <select id="tm-policy-key-id" onchange="clearCoverholderDropdown()">
+        <option value="">— None (stub mode) —</option>
+      </select>
+      <small>Shared API keys are managed in the API Keys section.</small>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Policy API Mode</label>
@@ -760,7 +760,7 @@
         </select>
         <button type="button" class="btn btn-outline btn-sm" onclick="loadCoverholders()" id="tm-coverholder-load-btn">Load</button>
       </div>
-      <small id="tm-coverholder-status">Save the API URL and key first, then click Load to fetch coverholders.</small>
+      <small id="tm-coverholder-status">Select a Policy API above, then click Load.</small>
     </div>
     <div class="form-group"><label>Modulr Account ID</label>
       <input id="tm-modulr-account" placeholder="A12345678" />
@@ -1253,10 +1253,23 @@ function openTenantModal(tenant) {
   document.getElementById('tm-logo-url').value = tenant?.logo_url || '';
   document.getElementById('tm-terms-url').value = tenant?.terms_url || '';
   document.getElementById('tm-register-claim-url').value = tenant?.register_claim_url || '';
-  document.getElementById('tm-policy-url').value = tenant?.policy_api_url || '';
-  document.getElementById('tm-policy-key').value = '';
   document.getElementById('tm-policy-mode').value = tenant?.policy_api_mode || 'stub';
   document.getElementById('tm-cover-benefit').value = tenant?.cover_benefit_name || 'Flight Delay';
+
+  // Load shared API keys into the policy API dropdown
+  const pkSelect = document.getElementById('tm-policy-key-id');
+  pkSelect.innerHTML = '<option value="">— None (stub mode) —</option>';
+  const keysRes = await GET('/api/admin/apikeys');
+  if (keysRes?.ok) {
+    keysRes.data.forEach(k => {
+      const opt = document.createElement('option');
+      opt.value = k.id;
+      opt.textContent = `${k.display_name} (${k.service_name})`;
+      if (k.id === tenant?.policy_api_key_id) opt.selected = true;
+      pkSelect.appendChild(opt);
+    });
+  }
+
   // Reset coverholder dropdown; if tenant has a saved key, show it as a pre-selected option
   const chSelect = document.getElementById('tm-coverholder-key');
   chSelect.innerHTML = '<option value="">— None —</option>';
@@ -1267,9 +1280,9 @@ function openTenantModal(tenant) {
     opt.selected = true;
     chSelect.appendChild(opt);
   }
-  document.getElementById('tm-coverholder-status').textContent = tenant?.policy_api_url
+  document.getElementById('tm-coverholder-status').textContent = tenant?.policy_api_key_id
     ? 'Click Load to refresh the coverholder list from PolicyHub.'
-    : 'Save the API URL and key first, then click Load to fetch coverholders.';
+    : 'Select a Policy API above, then click Load.';
   document.getElementById('tm-modulr-account').value = tenant?.modulr_account_id || '';
   document.getElementById('tm-modulr-key').value = '';
   document.getElementById('tm-modulr-mode').value = tenant?.modulr_mode || 'stub';
@@ -1301,7 +1314,7 @@ async function saveTenant() {
     logo_url:        document.getElementById('tm-logo-url').value.trim() || null,
     terms_url:           document.getElementById('tm-terms-url').value.trim() || null,
     register_claim_url:  document.getElementById('tm-register-claim-url').value.trim() || null,
-    policy_api_url:              document.getElementById('tm-policy-url').value.trim() || null,
+    policy_api_key_id:           parseInt(document.getElementById('tm-policy-key-id').value, 10) || null,
     policy_api_mode:             document.getElementById('tm-policy-mode').value,
     policy_api_coverholder_key:  document.getElementById('tm-coverholder-key').value || null,
     cover_benefit_name:          document.getElementById('tm-cover-benefit').value.trim() || null,
@@ -1312,8 +1325,6 @@ async function saveTenant() {
     portal_label:         document.getElementById('tm-portal-label').value.trim() || null,
   };
 
-  const policyKey = document.getElementById('tm-policy-key').value;
-  if (policyKey) body.policy_api_key = policyKey;
   const modulrKey = document.getElementById('tm-modulr-key').value;
   if (modulrKey) body.modulr_api_key = modulrKey;
 
@@ -1331,13 +1342,13 @@ function clearCoverholderDropdown() {
 }
 
 async function loadCoverholders() {
-  const tenantId = document.getElementById('tm-id').value;
+  const keyId = document.getElementById('tm-policy-key-id').value;
   const statusEl = document.getElementById('tm-coverholder-status');
   const btn = document.getElementById('tm-coverholder-load-btn');
   const sel = document.getElementById('tm-coverholder-key');
 
-  if (!tenantId) {
-    statusEl.textContent = 'Save the tenant first before loading coverholders.';
+  if (!keyId) {
+    statusEl.textContent = 'Select a Policy API first.';
     return;
   }
 
@@ -1346,7 +1357,7 @@ async function loadCoverholders() {
   statusEl.textContent = 'Fetching coverholders from PolicyHub…';
 
   const currentKey = sel.value;
-  const res = await GET(`/api/admin/coverholders?tenantId=${tenantId}`);
+  const res = await GET(`/api/admin/coverholders?keyId=${keyId}`);
 
   btn.disabled = false;
   btn.textContent = 'Load';

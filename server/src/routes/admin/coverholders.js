@@ -6,36 +6,36 @@ const { query } = require('../../db/connection');
 
 const router = express.Router();
 
-// GET /api/admin/coverholders?tenantId=<id>
-// Proxies the PolicyHub /api/coverholders endpoint for the given tenant.
-// Returns an array of { key, name } objects for the superadmin dropdown.
+// GET /api/admin/coverholders?keyId=<shared_api_keys id>
+// Proxies the PolicyHub /api/coverholders endpoint using a shared API key entry.
+// Returns an array of { key, name } objects for the tenant coverholder dropdown.
 router.get('/', async (req, res) => {
-  const tenantId = parseInt(req.query.tenantId, 10);
-  if (!tenantId || isNaN(tenantId)) {
-    return res.status(400).json({ error: 'tenantId query parameter is required' });
+  const keyId = parseInt(req.query.keyId, 10);
+  if (!keyId || isNaN(keyId)) {
+    return res.status(400).json({ error: 'keyId query parameter is required' });
   }
 
   const result = await query(
-    'SELECT policy_api_url, policy_api_key_enc FROM tenants WHERE id = $1',
-    [tenantId]
+    'SELECT key_enc, endpoint_url FROM shared_api_keys WHERE id = $1 AND is_active = true',
+    [keyId]
   );
   if (result.rows.length === 0) {
-    return res.status(404).json({ error: 'Tenant not found' });
+    return res.status(404).json({ error: 'API key not found or inactive' });
   }
 
-  const tenant = result.rows[0];
-  if (!tenant.policy_api_url || !tenant.policy_api_key_enc) {
-    return res.status(422).json({ error: 'Tenant has no policy API configured' });
+  const { key_enc, endpoint_url } = result.rows[0];
+  if (!endpoint_url) {
+    return res.status(422).json({ error: 'API key entry has no endpoint URL configured' });
   }
 
   let apiKey;
   try {
-    apiKey = decrypt(tenant.policy_api_key_enc);
+    apiKey = decrypt(key_enc);
   } catch {
     return res.status(500).json({ error: 'Failed to decrypt API key' });
   }
 
-  const baseUrl = tenant.policy_api_url.replace(/\/$/, '');
+  const baseUrl = endpoint_url.replace(/\/$/, '');
   const url = `${baseUrl}/api/coverholders`;
 
   let body;
@@ -53,7 +53,8 @@ router.get('/', async (req, res) => {
     return res.status(502).json({ error: `PolicyHub request failed: ${err.message}` });
   }
 
-  return res.json(Array.isArray(body) ? body : []);
+  const holders = Array.isArray(body) ? body : (Array.isArray(body?.data) ? body.data : []);
+  return res.json(holders);
 });
 
 module.exports = router;

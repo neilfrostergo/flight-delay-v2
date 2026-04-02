@@ -1,6 +1,7 @@
 'use strict';
 
 const { decrypt } = require('./encryption');
+const { query } = require('../db/connection');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STUB MODE
@@ -187,15 +188,25 @@ function stubValidate(policyNumber, email) {
 const POLICYHUB_STATUS_ACTIVE = 3;
 
 async function liveValidate(tenant, policyNumber, email) {
-  let apiKey;
-  try {
-    apiKey = decrypt(tenant.policy_api_key_enc);
-  } catch (err) {
-    console.error('[policyValidator] Failed to decrypt API key for tenant', tenant.slug, err.message);
-    return { valid: false, errorMessage: 'Policy validation service unavailable' };
+  if (!tenant.policy_api_key_id) {
+    return { valid: false, errorMessage: 'No policy API configured for this tenant' };
   }
 
-  const baseUrl = tenant.policy_api_url.replace(/\/$/, '');
+  let apiKey, baseUrl;
+  try {
+    const keyRow = await query(
+      'SELECT key_enc, endpoint_url FROM shared_api_keys WHERE id = $1 AND is_active = true',
+      [tenant.policy_api_key_id]
+    );
+    if (keyRow.rows.length === 0) {
+      return { valid: false, errorMessage: 'Policy validation service unavailable' };
+    }
+    apiKey = decrypt(keyRow.rows[0].key_enc);
+    baseUrl = keyRow.rows[0].endpoint_url.replace(/\/$/, '');
+  } catch (err) {
+    console.error('[policyValidator] Failed to load API key for tenant', tenant.slug, err.message);
+    return { valid: false, errorMessage: 'Policy validation service unavailable' };
+  }
   const coverHolderParam = tenant.policy_api_coverholder_key
     ? `&coverHolderKey=${encodeURIComponent(tenant.policy_api_coverholder_key)}`
     : '';
