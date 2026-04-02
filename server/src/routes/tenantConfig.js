@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const config = require('../config');
 const router = express.Router();
 
 // GET /api/tenant-config
@@ -23,6 +24,7 @@ router.get('/', (req, res) => {
     // Operational config the customer SPA needs
     minHoursBeforeDep: req.tenant.min_hours_before_dep,
     maxDaysBeforeDep:  req.tenant.max_days_before_dep || 40,
+    env:           config.nodeEnv,
   });
 });
 
