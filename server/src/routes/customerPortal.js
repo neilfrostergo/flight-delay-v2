@@ -99,20 +99,44 @@ router.post('/sessions', async (req, res) => {
 
   // Fetch policy detail fields to include in the JWT payload
   const regDetail = await query(
-    `SELECT policy_type, travelers, cover_summary
+    `SELECT policy_number, policy_type, travelers, cover_summary
      FROM registrations WHERE id = $1`,
     [registrationId]
   );
   const regDetailRow = regDetail.rows[0] || {};
 
+  // For registrations created before policy detail columns existed, re-validate
+  // the policy to populate the JWT with fresh data (and backfill the DB row).
+  let policyDetail = {
+    policy_type:   regDetailRow.policy_type   || null,
+    travelers:     regDetailRow.travelers      || null,
+    cover_summary: regDetailRow.cover_summary  || null,
+  };
+
+  if (!policyDetail.policy_type) {
+    const fresh = await validatePolicy(req.tenant, regDetailRow.policy_number, email.trim());
+    if (fresh.valid) {
+      policyDetail = {
+        policy_type:   fresh.policyType    || null,
+        travelers:     fresh.travelers      || null,
+        cover_summary: fresh.coverSummary   || null,
+      };
+      // Backfill so subsequent logins don't need to re-validate
+      await query(
+        `UPDATE registrations SET policy_type=$1, travelers=$2, cover_summary=$3 WHERE id=$4`,
+        [policyDetail.policy_type, JSON.stringify(policyDetail.travelers), JSON.stringify(policyDetail.cover_summary), registrationId]
+      );
+    }
+  }
+
   const token = jwt.sign(
     {
-      sub:          registrationId,
-      tenant_id:    req.tenant.id,
-      type:         'customer',
-      policy_type:  regDetailRow.policy_type  || null,
-      travelers:    regDetailRow.travelers     || null,
-      cover_summary: regDetailRow.cover_summary || null,
+      sub:           registrationId,
+      tenant_id:     req.tenant.id,
+      type:          'customer',
+      policy_type:   policyDetail.policy_type,
+      travelers:     policyDetail.travelers,
+      cover_summary: policyDetail.cover_summary,
     },
     config.jwt.secret,
     { expiresIn: '24h' }

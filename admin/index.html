@@ -1243,7 +1243,7 @@ function updateLogoPreview() {
   else { wrap.style.display = 'none'; }
 }
 
-function openTenantModal(tenant) {
+async function openTenantModal(tenant) {
   document.getElementById('tm-id').value = tenant?.id || '';
   document.getElementById('tm-name').value = tenant?.name || '';
   document.getElementById('tm-slug').value = tenant?.slug || '';
