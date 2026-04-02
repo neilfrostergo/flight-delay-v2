@@ -1015,6 +1015,11 @@
 </head>
 <body>
 
+<!-- ── UAT Banner ────────────────────────────────────────────────────────────── -->
+<div id="uat-banner" style="display:none;background:#d29922;color:#000;text-align:center;padding:8px 16px;font-weight:600;font-size:14px;letter-spacing:0.01em">
+  ⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS
+</div>
+
 <!-- ── Header ────────────────────────────────────────────────────────────────── -->
 <header class="header" id="app-header">
   <div class="header-text">
@@ -1418,6 +1423,9 @@ const state = {
       state.minHoursBeforeDep = state.tenant.minHoursBeforeDep || 24;
       state.maxDaysBeforeDep  = state.tenant.maxDaysBeforeDep  || 40;
       document.querySelectorAll('#min-hours').forEach(el => el.textContent = state.minHoursBeforeDep);
+      if (state.tenant.env === 'uat') {
+        document.getElementById('uat-banner').style.display = '';
+      }
     }
   } catch (_) {}
 
