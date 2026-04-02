@@ -37,6 +37,7 @@ router.post('/', async (req, res) => {
     payoutPence: result.payoutPence,
     coverStartDate: result.coverStartDate,
     coverEndDate: result.coverEndDate,
+    coverSummary: result.coverSummary || null,
     policyNumber: value.policy_number,
   });
 });

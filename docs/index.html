@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Delay v2 — Documentation</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --bg2:       #161b22;
+    --bg3:       #21262d;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --text-muted:#8b949e;
+    --blue:      #58a6ff;
+    --green:     #3fb950;
+    --yellow:    #d29922;
+    --purple:    #bc8cff;
+    --orange:    #e3b341;
+    --accent:    #1f6feb;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Top nav ── */
+  .topnav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 200;
+  }
+  .topnav-brand {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+    margin-right: 24px;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .topnav-links { display: flex; gap: 2px; flex: 1; }
+  .topnav-links a {
+    padding: 4px 10px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .topnav-links a:hover, .topnav-links a.current { color: var(--text); background: rgba(255,255,255,0.06); }
+  .topnav-links a.current { color: var(--blue); }
+
+  /* ── Page ── */
+  .page {
+    padding: 80px 56px 56px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    font-size: 15px;
+    color: var(--text-muted);
+    margin-bottom: 48px;
+  }
+
+  h2 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 40px 0 16px;
+  }
+
+  /* ── Doc cards ── */
+  .doc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
+  .doc-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, background 0.15s;
+    display: block;
+  }
+
+  .doc-card:hover {
+    border-color: var(--blue);
+    background: rgba(88,166,255,0.04);
+  }
+
+  .doc-card-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .doc-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .doc-card-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  .doc-card-sections {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .doc-card-sections li a {
+    font-size: 12px;
+    color: var(--blue);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .doc-card-sections li a:hover { text-decoration: underline; }
+
+  .doc-card-sections li a::before {
+    content: '→';
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .doc-card-footer {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .doc-card-footer .open-link {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--blue);
+    text-decoration: none;
+  }
+
+  .doc-card-footer .pdf-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.15s;
+  }
+
+  .doc-card-footer .pdf-btn:hover {
+    border-color: var(--blue);
+    color: var(--blue);
+  }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-yellow { background: rgba(210,153,34,0.15); color: var(--yellow); }
+
+  /* ── Status bar ── */
+  .status-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+    padding: 16px 20px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+
+  .status-item { display: flex; align-items: center; gap: 8px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.green  { background: var(--green); }
+  .status-dot.yellow { background: var(--yellow); }
+  .status-dot.grey   { background: var(--text-muted); }
+  .status-label { color: var(--text-muted); }
+  .status-value { color: var(--text); font-weight: 600; }
+
+  @media print {
+    .topnav { display: none !important; }
+    body { background: #fff !important; color: #1a1a2e !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <a class="topnav-brand" href="index.html">Flight Delay v2</a>
+  <div class="topnav-links">
+    <a href="index.html" class="current">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="environments.html">Environments</a>
+    <a href="development.html">Development</a>
+  </div>
+</div>
+
+<div class="page">
+
+  <h1>Flight Delay v2</h1>
+  <p class="subtitle">Internal documentation — <span class="badge badge-yellow">Internal use only</span></p>
+
+  <div class="status-row">
+    <div class="status-item">
+      <div class="status-dot green"></div>
+      <span class="status-label">Production</span>
+      <span class="status-value">Live — fdv2-prod-rg</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot green"></div>
+      <span class="status-label">UAT</span>
+      <span class="status-value">Live — fdv2-uat-rg</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot yellow"></div>
+      <span class="status-label">Domain</span>
+      <span class="status-value">Pending registration</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot yellow"></div>
+      <span class="status-label">Prod email</span>
+      <span class="status-value">Pending ACS setup</span>
+    </div>
+  </div>
+
+  <h2>Reference Documents</h2>
+  <div class="doc-grid">
+
+    <a class="doc-card" href="architecture.html">
+      <span class="doc-card-icon">🏗️</span>
+      <div class="doc-card-title">Architecture Reference</div>
+      <div class="doc-card-desc">Azure infrastructure, network topology, request flow, security controls, runbook, and troubleshooting guide.</div>
+      <ul class="doc-card-sections">
+        <li><a href="architecture.html#overview">Platform Overview</a></li>
+        <li><a href="architecture.html#resources">Azure Resources</a></li>
+        <li><a href="architecture.html#network">Network Topology</a></li>
+        <li><a href="architecture.html#security">Security Controls</a></li>
+        <li><a href="architecture.html#runbook">Runbook</a></li>
+        <li><a href="architecture.html#troubleshooting">Troubleshooting</a></li>
+      </ul>
+      <div class="doc-card-footer">
+        <span class="open-link">Open →</span>
+        <a class="pdf-btn" href="architecture.html" onclick="event.preventDefault(); window.open('architecture.html','_blank').print()">Save as PDF</a>
+      </div>
+    </a>
+
+    <a class="doc-card" href="environments.html">
+      <span class="doc-card-icon">🌍</span>
+      <div class="doc-card-title">Environment Strategy</div>
+      <div class="doc-card-desc">Dev / UAT / Production environments, Git Flow branching, safety controls, cost breakdown, and promotion process.</div>
+      <ul class="doc-card-sections">
+        <li><a href="environments.html#overview">Environment Summary</a></li>
+        <li><a href="environments.html#git-flow">Git Flow</a></li>
+        <li><a href="environments.html#uat-infra">UAT Infrastructure</a></li>
+        <li><a href="environments.html#safety">Safety Controls</a></li>
+        <li><a href="environments.html#promotion">UAT → Production</a></li>
+        <li><a href="environments.html#costs">Monthly Costs</a></li>
+      </ul>
+      <div class="doc-card-footer">
+        <span class="open-link">Open →</span>
+        <a class="pdf-btn" href="environments.html" onclick="event.preventDefault(); window.open('environments.html','_blank').print()">Save as PDF</a>
+      </div>
+    </a>
+
+    <a class="doc-card" href="development.html">
+      <span class="doc-card-icon">💻</span>
+      <div class="doc-card-title">Development Workflow</div>
+      <div class="doc-card-desc">How to make changes, test locally, raise pull requests, deploy to UAT, and promote to production.</div>
+      <ul class="doc-card-sections">
+        <li><a href="development.html#overview">Workflow Overview</a></li>
+        <li><a href="development.html#local-setup">Local Setup</a></li>
+        <li><a href="development.html#making-changes">Making Changes</a></li>
+        <li><a href="development.html#raising-pr">Raising a PR</a></li>
+        <li><a href="development.html#uat">UAT Deployment</a></li>
+        <li><a href="development.html#commands">Useful Commands</a></li>
+      </ul>
+      <div class="doc-card-footer">
+        <span class="open-link">Open →</span>
+        <a class="pdf-btn" href="development.html" onclick="event.preventDefault(); window.open('development.html','_blank').print()">Save as PDF</a>
+      </div>
+    </a>
+
+  </div>
+
+</div>
+
+</body>
+</html>

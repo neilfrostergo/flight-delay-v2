@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Delay v2 — Environment Strategy</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --bg2:       #161b22;
+    --bg3:       #21262d;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --text-muted:#8b949e;
+    --blue:      #58a6ff;
+    --green:     #3fb950;
+    --yellow:    #d29922;
+    --red:       #f85149;
+    --purple:    #bc8cff;
+    --orange:    #e3b341;
+    --teal:      #39d353;
+    --accent:    #1f6feb;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Layout ── */
+  .sidebar {
+    position: fixed;
+    top: 44px; left: 0;
+    width: 220px;
+    height: calc(100vh - 44px);
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 0;
+    z-index: 100;
+  }
+
+  .sidebar-logo {
+    padding: 0 16px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+
+  .sidebar-logo .product {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .sidebar-logo .doc-type {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .sidebar nav a {
+    display: block;
+    padding: 6px 16px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .sidebar nav a:hover,
+  .sidebar nav a.active {
+    color: var(--blue);
+    border-left-color: var(--blue);
+    background: rgba(88,166,255,0.06);
+  }
+
+  .sidebar nav .section-label {
+    padding: 14px 16px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  main {
+    margin-left: 220px;
+    padding: 80px 56px 48px;
+    max-width: 1200px;
+  }
+
+  /* ── Typography ── */
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--blue);
+    margin: 28px 0 10px;
+  }
+
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 20px 0 8px;
+  }
+
+  p { margin-bottom: 12px; color: var(--text); }
+
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--orange);
+  }
+
+  pre {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 12px 0 20px;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  /* ── Cards & Boxes ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-blue   { background: rgba(88,166,255,0.15);   color: var(--blue);   }
+  .badge-green  { background: rgba(63,185,80,0.15);    color: var(--green);  }
+  .badge-yellow { background: rgba(210,153,34,0.15);   color: var(--yellow); }
+  .badge-red    { background: rgba(248,81,73,0.15);    color: var(--red);    }
+  .badge-purple { background: rgba(188,140,255,0.15);  color: var(--purple); }
+  .badge-orange { background: rgba(227,179,65,0.15);   color: var(--orange); }
+
+  /* ── Tables ── */
+  .table-wrap {
+    overflow-x: auto;
+    margin-bottom: 24px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    background: var(--bg3);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── Diagrams ── */
+  .diagram-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px 0 32px;
+    overflow-x: auto;
+  }
+
+  svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  /* ── Numbered steps ── */
+  .steps { list-style: none; counter-reset: step; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 12px 16px 12px 52px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px; height: 24px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 24px;
+    text-align: center;
+  }
+
+  /* ── Callouts ── */
+  .callout {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 12px 0 20px;
+    font-size: 13px;
+    border-left: 3px solid;
+  }
+  .callout-info    { background: rgba(88,166,255,0.08);   border-color: var(--blue);   color: var(--text); }
+  .callout-warning { background: rgba(210,153,34,0.1);    border-color: var(--yellow); color: var(--text); }
+  .callout-danger  { background: rgba(248,81,73,0.08);    border-color: var(--red);    color: var(--text); }
+  .callout-success { background: rgba(63,185,80,0.08);    border-color: var(--green);  color: var(--text); }
+
+  /* ── Page header ── */
+  .page-header {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .meta-row span { display: flex; align-items: center; gap: 6px; }
+
+  /* ── Section anchor ── */
+  section { scroll-margin-top: 24px; }
+
+  /* ── Cost breakdown ── */
+  .cost-row-prod td:last-child { color: var(--blue); font-weight: 600; }
+  .cost-row-uat  td:last-child { color: var(--green); font-weight: 600; }
+  .cost-total td { font-weight: 700; border-top: 2px solid var(--border); }
+
+  section { scroll-margin-top: 68px; }
+
+  /* ── Top navigation bar ── */
+  .topnav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 200;
+  }
+  .topnav-brand {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+    margin-right: 24px;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .topnav-links { display: flex; gap: 2px; flex: 1; }
+  .topnav-links a {
+    padding: 4px 10px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .topnav-links a:hover, .topnav-links a.current { color: var(--text); background: rgba(255,255,255,0.06); }
+  .topnav-links a.current { color: var(--blue); }
+  .topnav-print {
+    margin-left: auto;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .topnav-print:hover { background: #388bfd; }
+
+  @media print {
+    .topnav  { display: none !important; }
+    .sidebar { display: none !important; }
+    main { margin-left: 0 !important; padding: 24px 32px !important; max-width: 100% !important; }
+    body { background: #fff !important; }
+    h1, h2, h3, h4, p, td, li { color: #1a1a2e !important; }
+    h3 { color: #1f6feb !important; }
+    h2 { border-bottom-color: #ddd !important; }
+    code { background: #f6f8fa !important; border-color: #ddd !important; color: #c7254e !important; }
+    pre { background: #f6f8fa !important; border-color: #ddd !important; }
+    pre code { color: #333 !important; }
+    th { background: #f6f8fa !important; color: #555 !important; }
+    td { border-bottom-color: #eee !important; }
+    .stat-card, .card, .diagram-wrap { background: #f6f8fa !important; border-color: #ddd !important; }
+    .callout-info    { background: #e8f4fd !important; border-color: #1f6feb !important; }
+    .callout-warning { background: #fffbeb !important; border-color: #d29922 !important; }
+    .steps li { background: #f6f8fa !important; border-color: #ddd !important; }
+    .steps li::before { background: #1f6feb !important; }
+    a { color: #1f6feb !important; }
+    .page-header { border-bottom-color: #ddd !important; }
+    .meta-row { color: #555 !important; }
+    .cost-row-prod td:last-child { color: #1e40af !important; }
+    .cost-row-uat  td:last-child { color: #166534 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <a class="topnav-brand" href="index.html">Flight Delay v2</a>
+  <div class="topnav-links">
+    <a href="index.html">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="environments.html" class="current">Environments</a>
+    <a href="development.html">Development</a>
+  </div>
+  <button class="topnav-print" onclick="window.print()">Save as PDF</button>
+</div>
+
+<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="product">Flight Delay v2</div>
+    <div class="doc-type">Environment Strategy</div>
+  </div>
+  <nav>
+    <div class="section-label">Overview</div>
+    <a href="#overview">Environment Summary</a>
+    <a href="#git-flow">Git Flow &amp; Branching</a>
+
+    <div class="section-label">Infrastructure</div>
+    <a href="#uat-infra">UAT Infrastructure</a>
+    <a href="#prod-infra">Production Resources</a>
+    <a href="#shared">Shared Resources</a>
+
+    <div class="section-label">Safety</div>
+    <a href="#safety">Safety Controls</a>
+    <a href="#slug-blocklist">Reserved Slug Blocklist</a>
+
+    <div class="section-label">Operations</div>
+    <a href="#promotion">UAT → Production</a>
+    <a href="#costs">Monthly Cost Breakdown</a>
+    <a href="#access">Access &amp; Endpoints</a>
+  </nav>
+</aside>
+
+<!-- ══════════════════════ MAIN ══════════════════════ -->
+<main>
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <h1>Flight Delay v2 — Environment Strategy</h1>
+    <div class="meta-row">
+      <span>Environments: <strong>Dev · UAT · Production</strong></span>
+      <span>Branching: <strong>Git Flow</strong></span>
+      <span>Last updated: <strong>2026-04-02</strong></span>
+      <span><span class="badge badge-yellow">Internal use only</span></span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 1. OVERVIEW ═══════════════════ -->
+  <section id="overview">
+    <h2>1. Environment Summary</h2>
+
+    <p>
+      The platform operates three environments. Development runs locally via Docker Compose.
+      UAT is a lightweight Azure environment used for integration testing before every production release.
+      Production is the live customer-facing deployment. All three use the same Docker image and Node.js
+      application — the environment is controlled by <code>NODE_ENV</code> and Key Vault secrets.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th style="color:var(--purple)">Dev (Local)</th>
+            <th style="color:var(--green)">UAT (Azure)</th>
+            <th style="color:var(--blue)">Production (Azure)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Infrastructure</td>
+            <td>Docker Compose</td>
+            <td><code>fdv2-uat-rg</code></td>
+            <td><code>fdv2-prod-rg</code></td>
+          </tr>
+          <tr>
+            <td>Git branch</td>
+            <td><code>feature/*</code></td>
+            <td><code>develop</code></td>
+            <td><code>main</code></td>
+          </tr>
+          <tr>
+            <td>Deployment</td>
+            <td>Manual (<code>docker compose up</code>)</td>
+            <td>Auto on push to <code>develop</code></td>
+            <td>Auto on push to <code>main</code></td>
+          </tr>
+          <tr>
+            <td>Domain</td>
+            <td><code>localhost:3000</code></td>
+            <td><code>*.uat.delayedpaid.co.uk</code></td>
+            <td><code>*.delayedpaid.co.uk</code></td>
+          </tr>
+          <tr>
+            <td><code>NODE_ENV</code></td>
+            <td><code>development</code></td>
+            <td><code>uat</code></td>
+            <td><code>production</code></td>
+          </tr>
+          <tr>
+            <td>PostgreSQL</td>
+            <td>Local container</td>
+            <td>Burstable B1ms · no HA</td>
+            <td>D2s_v3 · Zone-redundant HA</td>
+          </tr>
+          <tr>
+            <td>Container Apps</td>
+            <td>—</td>
+            <td>Min 0 · scale to zero · 08:00–19:00</td>
+            <td>Min 1 · max 5 · always on</td>
+          </tr>
+          <tr>
+            <td>Front Door / WAF</td>
+            <td>—</td>
+            <td>❌ Direct ACA URL</td>
+            <td>✅ Front Door Premium + WAF</td>
+          </tr>
+          <tr>
+            <td>Payments (Modulr)</td>
+            <td>Stub (fake)</td>
+            <td>Stub (forced — no live credentials)</td>
+            <td>Live</td>
+          </tr>
+          <tr>
+            <td>Policy API</td>
+            <td>Stub (fake)</td>
+            <td>Stub (forced by <code>NODE_ENV=uat</code>)</td>
+            <td>Live</td>
+          </tr>
+          <tr>
+            <td>Event Hub</td>
+            <td>DB poller (30 s)</td>
+            <td>DB poller (30 s)</td>
+            <td>Azure Event Hub</td>
+          </tr>
+          <tr>
+            <td>Outbound email</td>
+            <td>SMTP (to dev inbox)</td>
+            <td>Redirected via <code>DEV_EMAIL_OVERRIDE</code></td>
+            <td>Live SMTP to customer</td>
+          </tr>
+          <tr>
+            <td>UAT banner</td>
+            <td>—</td>
+            <td>⚠️ Yellow banner in both SPAs</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>Estimated cost</td>
+            <td>£0</td>
+            <td>~£36/month</td>
+            <td>~£501/month</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 2. GIT FLOW ═══════════════════ -->
+  <section id="git-flow">
+    <h2>2. Git Flow &amp; Branching</h2>
+
+    <p>
+      The branching model follows a simplified Git Flow: feature branches merge to <code>develop</code>,
+      which auto-deploys to UAT. A manual PR promotes <code>develop</code> to <code>main</code>, which
+      auto-deploys to production.
+    </p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 760 200" width="100%" style="font-family:inherit">
+        <!-- feature branch -->
+        <circle cx="100" cy="50" r="7" fill="#bc8cff"/>
+        <circle cx="220" cy="50" r="7" fill="#bc8cff"/>
+        <line x1="107" y1="50" x2="213" y2="50" stroke="#bc8cff" stroke-width="2" stroke-dasharray="5"/>
+        <text x="160" y="36" fill="#bc8cff" font-size="12" text-anchor="middle" font-weight="600">feature/my-change</text>
+        <text x="160" y="72" fill="#8b949e" font-size="10" text-anchor="middle">local only · Docker Compose</text>
+
+        <!-- arrow to develop -->
+        <line x1="220" y1="57" x2="270" y2="103" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="264" y="85" fill="#8b949e" font-size="9">PR merge</text>
+
+        <!-- develop branch -->
+        <circle cx="80"  cy="115" r="7" fill="#3fb950"/>
+        <circle cx="280" cy="115" r="7" fill="#3fb950"/>
+        <circle cx="440" cy="115" r="7" fill="#3fb950"/>
+        <circle cx="580" cy="115" r="7" fill="#3fb950"/>
+        <line x1="87" y1="115" x2="573" y2="115" stroke="#3fb950" stroke-width="2.5"/>
+        <text x="330" y="100" fill="#3fb950" font-size="13" text-anchor="middle" font-weight="700">develop</text>
+        <text x="330" y="136" fill="#8b949e" font-size="10" text-anchor="middle">auto-deploys to UAT on every push</text>
+
+        <!-- arrow to main -->
+        <line x1="580" y1="122" x2="620" y2="162" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="630" y="147" fill="#d29922" font-size="9">manual</text>
+        <text x="630" y="158" fill="#d29922" font-size="9">promote</text>
+
+        <!-- main branch -->
+        <circle cx="80"  cy="175" r="7" fill="#58a6ff"/>
+        <circle cx="280" cy="175" r="7" fill="#58a6ff"/>
+        <circle cx="480" cy="175" r="7" fill="#58a6ff"/>
+        <circle cx="660" cy="175" r="7" fill="#58a6ff"/>
+        <line x1="87" y1="175" x2="653" y2="175" stroke="#58a6ff" stroke-width="2.5"/>
+        <text x="370" y="160" fill="#58a6ff" font-size="13" text-anchor="middle" font-weight="700">main</text>
+        <text x="370" y="195" fill="#8b949e" font-size="10" text-anchor="middle">auto-deploys to production on push</text>
+
+        <!-- labels -->
+        <text x="32" y="54" fill="#bc8cff" font-size="11" text-anchor="middle" font-weight="700">DEV</text>
+        <text x="32" y="119" fill="#3fb950" font-size="11" text-anchor="middle" font-weight="700">UAT</text>
+        <text x="32" y="179" fill="#58a6ff" font-size="11" text-anchor="middle" font-weight="700">PROD</text>
+
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#8b949e"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <h3>Hotfix Process</h3>
+    <p>For urgent production fixes, branch from <code>main</code>, fix, merge to <code>main</code> (deploys to prod), then also merge to <code>develop</code> to keep branches in sync.</p>
+
+    <div class="callout callout-warning">
+      <strong>Never merge directly to <code>main</code> without UAT sign-off</strong> — except for genuine hotfixes where the risk of the bug outweighs the testing gap.
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 3. UAT INFRASTRUCTURE ═══════════════════ -->
+  <section id="uat-infra">
+    <h2>3. UAT Infrastructure</h2>
+
+    <p>
+      All UAT resources live in <code>fdv2-uat-rg</code>, UK South. The environment is designed to scale
+      to zero outside office hours to minimise cost.
+    </p>
+
+    <div class="card-grid">
+      <div class="stat-card">
+        <div class="label">Resource Group</div>
+        <div class="value" style="font-size:13px">fdv2-uat-rg</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Location</div>
+        <div class="value">UK South</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">VNet</div>
+        <div class="value" style="font-size:13px">fdv2-uat-vnet</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Est. monthly cost</div>
+        <div class="value" style="color:var(--green)">~£36</div>
+      </div>
+    </div>
+
+    <h3>Network Layout</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Subnet</th>
+            <th>CIDR</th>
+            <th>Contents</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>fdv2-uat-aca-subnet</code></td>
+            <td><code>10.101.0.0/21</code></td>
+            <td>Container Apps Environment</td>
+          </tr>
+          <tr>
+            <td><code>fdv2-uat-data-subnet</code></td>
+            <td><code>10.101.8.0/24</code></td>
+            <td>PostgreSQL Flexible Server</td>
+          </tr>
+          <tr>
+            <td><code>fdv2-uat-pe-subnet</code></td>
+            <td><code>10.101.9.0/24</code></td>
+            <td>Key Vault private endpoint</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Compute</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>Name</th>
+            <th>Config</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Container Apps Environment</td>
+            <td><code>fdv2-uat-aca-env</code></td>
+            <td>VNet-integrated · external ingress · Consumption plan</td>
+          </tr>
+          <tr>
+            <td>Container App</td>
+            <td><code>fdv2-uat-app</code></td>
+            <td>Min 0 replicas · max 2 · 0.5 vCPU / 1 GB RAM</td>
+          </tr>
+          <tr>
+            <td>Scale schedule</td>
+            <td>—</td>
+            <td>Min 1 at 08:00 UTC · min 0 at 19:00 UTC (Mon–Fri)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Data &amp; Secrets</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>Name</th>
+            <th>Config</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PostgreSQL Flexible Server</td>
+            <td><code>fdv2-uat-postgres</code></td>
+            <td>Burstable B1ms · 1 vCore / 2 GB RAM · 32 GB storage · no HA · VNet-injected</td>
+          </tr>
+          <tr>
+            <td>Key Vault</td>
+            <td><code>fdv2-uat-keyvault</code></td>
+            <td>RBAC · private endpoint · own secrets (no live credentials)</td>
+          </tr>
+          <tr>
+            <td>Managed Identity</td>
+            <td><code>fdv2-uat-identity</code></td>
+            <td>Separate from production identity · Key Vault Secrets User role</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-info">
+      UAT does <strong>not</strong> include Front Door, NAT Gateway, or Event Hub — these are production-only resources. UAT is accessed directly via the Container Apps FQDN or via <code>*.uat.delayedpaid.co.uk</code> (wildcard CNAME in Azure DNS).
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 4. PRODUCTION RESOURCES ═══════════════════ -->
+  <section id="prod-infra">
+    <h2>4. Production Resources</h2>
+
+    <p>Production lives in <code>fdv2-prod-rg</code>. See <a href="architecture.html">Architecture Reference</a> for the full production topology. Key differences from UAT:</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th style="color:var(--green)">UAT</th>
+            <th style="color:var(--blue)">Production</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PostgreSQL SKU</td>
+            <td>Burstable B1ms</td>
+            <td>General Purpose D2s_v3 · Zone-redundant HA</td>
+          </tr>
+          <tr>
+            <td>Container Apps replicas</td>
+            <td>0–2 (scale to zero)</td>
+            <td>1–5 (always on)</td>
+          </tr>
+          <tr>
+            <td>Ingress</td>
+            <td>Direct ACA URL + wildcard CNAME</td>
+            <td>Azure Front Door Premium + WAF policy</td>
+          </tr>
+          <tr>
+            <td>Outbound IP</td>
+            <td>Dynamic (no NAT Gateway)</td>
+            <td>Static via NAT Gateway</td>
+          </tr>
+          <tr>
+            <td>Event processing</td>
+            <td>30 s DB poller</td>
+            <td>Azure Event Hub consumer</td>
+          </tr>
+          <tr>
+            <td>Monitoring</td>
+            <td>Basic Log Analytics</td>
+            <td>Full Azure Monitor + alerts</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 5. SHARED RESOURCES ═══════════════════ -->
+  <section id="shared">
+    <h2>5. Shared Resources</h2>
+
+    <p>
+      Two resources are shared between UAT and production. Everything else is fully isolated — separate
+      databases, Key Vaults, identities, and resource groups ensure zero state bleed.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>Name</th>
+            <th>Why shared</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Azure Container Registry</td>
+            <td><code>fdv2acr</code></td>
+            <td>Same Docker images are built once and deployed to both environments — UAT tests the exact image that will go to production</td>
+          </tr>
+          <tr>
+            <td>Azure DNS Zone</td>
+            <td><code>delayedpaid.co.uk</code></td>
+            <td>A single DNS zone hosts both <code>*.delayedpaid.co.uk</code> (prod) and <code>*.uat.delayedpaid.co.uk</code> (UAT wildcard CNAME)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 6. SAFETY CONTROLS ═══════════════════ -->
+  <section id="safety">
+    <h2>6. Safety Controls</h2>
+
+    <p>
+      UAT must never process real customer data, issue live payments, or trigger live policy lookups.
+      The following controls are enforced in code and infrastructure.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Risk</th>
+            <th>Control</th>
+            <th>Enforced by</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Real customer registers in UAT</td>
+            <td><code>NODE_ENV=uat</code> forces stub policy validator — returns mock data regardless of tenant config</td>
+            <td>Code: <code>policyValidator.js</code></td>
+          </tr>
+          <tr>
+            <td>Real payment sent to customer</td>
+            <td>Modulr stub mode forced in UAT — no live Modulr credentials exist in UAT Key Vault</td>
+            <td>Code: <code>modulr.js</code> + Key Vault secrets</td>
+          </tr>
+          <tr>
+            <td>Tester confused about environment</td>
+            <td>Yellow "⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS" banner visible in both admin SPA and customer SPA</td>
+            <td><code>customer/index.html</code> + <code>admin/index.html</code></td>
+          </tr>
+          <tr>
+            <td>Real email sent to customer</td>
+            <td><code>DEV_EMAIL_OVERRIDE</code> set in UAT Key Vault — all outbound email redirected to internal test inbox</td>
+            <td>Key Vault secret + <code>notificationService.js</code></td>
+          </tr>
+          <tr>
+            <td>UAT data bleeds into production</td>
+            <td>Separate database server, separate Key Vault, separate resource group — zero shared state</td>
+            <td>Azure infrastructure isolation</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>How stub enforcement works</h3>
+    <p>
+      Both <code>policyValidator.js</code> and <code>modulr.js</code> check <code>NODE_ENV</code> before
+      making any live API call. If the value is <code>uat</code> or <code>development</code>, the stub
+      path is always taken — even if the tenant's database record has <code>policy_api_mode = 'live'</code>
+      or <code>modulr_mode = 'live'</code>. This prevents a misconfigured tenant from accidentally
+      triggering real integrations in UAT.
+    </p>
+
+    <h3>UAT banner</h3>
+    <p>
+      The server exposes <code>NODE_ENV</code> via <code>GET /api/tenant-config</code> as the <code>env</code>
+      field. Both SPAs read this field on load and show a fixed yellow banner when <code>env === 'uat'</code>.
+    </p>
+  </section>
+
+  <!-- ═══════════════════ 7. RESERVED SLUG BLOCKLIST ═══════════════════ -->
+  <section id="slug-blocklist">
+    <h2>7. Reserved Slug Blocklist</h2>
+
+    <p>
+      Tenant slugs form subdomains (<code>slug.delayedpaid.co.uk</code>). Certain slugs are reserved to
+      prevent conflicts with infrastructure subdomains and UAT. The blocklist is enforced in
+      <code>POST /api/admin/tenants</code> (create) and <code>PUT /api/admin/tenants/:id</code> (rename).
+    </p>
+
+    <pre><code>const RESERVED_SLUGS = [
+  'uat', 'www', 'api', 'admin', 'health',
+  'mail', 'smtp', 'staging', 'dev', 'test'
+];</code></pre>
+
+    <p>Attempting to create or rename a tenant to one of these slugs returns <code>HTTP 400</code>.</p>
+  </section>
+
+  <!-- ═══════════════════ 8. PROMOTION ═══════════════════ -->
+  <section id="promotion">
+    <h2>8. UAT → Production Promotion</h2>
+
+    <p>
+      Production is updated by merging <code>develop</code> into <code>main</code>. GitHub Actions
+      detects the push and deploys automatically. Target turnaround from merge to live: ~3 minutes.
+    </p>
+
+    <ol class="steps">
+      <li>UAT testing complete — internal sign-off obtained</li>
+      <li>Open a pull request in GitHub: <strong>develop → main</strong></li>
+      <li>Review the diff — confirm only intended changes are included</li>
+      <li>Merge the PR (no second approver required at current team size)</li>
+      <li>GitHub Actions <code>deploy-prod.yml</code> triggers: builds image → pushes to <code>fdv2acr</code> → updates <code>fdv2-app</code></li>
+      <li>Production is live. Verify at <code>https://admin.delayedpaid.co.uk</code></li>
+    </ol>
+
+    <div class="callout callout-info">
+      The UAT workflow tags images as <code>develop-&lt;sha&gt;</code> and <code>develop-latest</code>.
+      The production workflow builds a fresh image tagged <code>&lt;sha&gt;</code> and <code>latest</code>.
+      Both pipelines authenticate to Azure via OIDC (workload identity federation) — no long-lived
+      credentials in GitHub secrets.
+    </div>
+
+    <h3>GitHub Actions Workflows</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Workflow file</th>
+            <th>Trigger</th>
+            <th>Deploys to</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.github/workflows/deploy-uat.yml</code></td>
+            <td>Push to <code>develop</code></td>
+            <td><code>fdv2-uat-app</code> in <code>fdv2-uat-rg</code></td>
+          </tr>
+          <tr>
+            <td><code>.github/workflows/deploy-prod.yml</code></td>
+            <td>Push to <code>main</code></td>
+            <td><code>fdv2-app</code> in <code>fdv2-prod-rg</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 9. COST BREAKDOWN ═══════════════════ -->
+  <section id="costs">
+    <h2>9. Monthly Cost Breakdown</h2>
+
+    <p>Estimates in GBP, UK South pricing, April 2026. Production costs assume the existing live environment.</p>
+
+    <h3>Production (~£501/month)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>SKU / Config</th>
+            <th>Est. £/month</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="cost-row-prod">
+            <td>PostgreSQL Flexible Server</td>
+            <td>General Purpose D2s_v3 · Zone-redundant HA · 64 GB storage</td>
+            <td>~£220</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>Azure Front Door Premium</td>
+            <td>Base fee + routing units + WAF policy</td>
+            <td>~£110</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>Container Apps</td>
+            <td>1–5 replicas · 0.5 vCPU / 1 GB · Consumption plan</td>
+            <td>~£60</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>NAT Gateway</td>
+            <td>Static outbound IP · ~10 GB/month egress</td>
+            <td>~£40</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>Azure Event Hub</td>
+            <td>Standard · 1 TU · OAG flight events</td>
+            <td>~£25</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>Key Vault</td>
+            <td>Standard · secret operations</td>
+            <td>~£5</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>Log Analytics / Monitor</td>
+            <td>~5 GB/month ingestion</td>
+            <td>~£20</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>Container Registry</td>
+            <td>Basic tier (shared with UAT)</td>
+            <td>~£4</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>DNS Zone + bandwidth</td>
+            <td>Azure DNS + egress</td>
+            <td>~£5</td>
+          </tr>
+          <tr class="cost-row-prod">
+            <td>Private Endpoints / networking</td>
+            <td>KV endpoint, VNet peering overhead</td>
+            <td>~£12</td>
+          </tr>
+          <tr class="cost-total">
+            <td colspan="2"><strong>Production total</strong></td>
+            <td style="color:var(--blue)"><strong>~£501</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>UAT (~£36/month)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>SKU / Config</th>
+            <th>Est. £/month</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="cost-row-uat">
+            <td>PostgreSQL Flexible Server</td>
+            <td>Burstable B1ms · 1 vCore / 2 GB · 32 GB storage · no HA</td>
+            <td>~£20</td>
+          </tr>
+          <tr class="cost-row-uat">
+            <td>Container Apps</td>
+            <td>Scale to zero outside 08:00–19:00 Mon–Fri · ~55 hr/week active</td>
+            <td>~£8</td>
+          </tr>
+          <tr class="cost-row-uat">
+            <td>Key Vault</td>
+            <td>Standard · low operation volume</td>
+            <td>~£2</td>
+          </tr>
+          <tr class="cost-row-uat">
+            <td>Log Analytics</td>
+            <td>~1 GB/month ingestion</td>
+            <td>~£4</td>
+          </tr>
+          <tr class="cost-row-uat">
+            <td>Private Endpoint (Key Vault)</td>
+            <td>1 endpoint · minimal traffic</td>
+            <td>~£2</td>
+          </tr>
+          <tr class="cost-total">
+            <td colspan="2"><strong>UAT total</strong></td>
+            <td style="color:var(--green)"><strong>~£36</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Environment</th>
+            <th>Monthly cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Production</td>
+            <td style="color:var(--blue);font-weight:600">~£501</td>
+          </tr>
+          <tr>
+            <td>UAT</td>
+            <td style="color:var(--green);font-weight:600">~£36</td>
+          </tr>
+          <tr>
+            <td><strong>Total</strong></td>
+            <td style="color:var(--text);font-weight:700">~£537/month</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-info">
+      The Container Registry (<code>fdv2acr</code>) cost is included once under Production as it is a shared resource. UAT's scale-to-zero schedule reduces compute costs by approximately 65% compared to always-on — from ~£22/month to ~£8/month for the Container App alone.
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 10. ACCESS & ENDPOINTS ═══════════════════ -->
+  <section id="access">
+    <h2>10. Access &amp; Endpoints</h2>
+
+    <h3>UAT</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Purpose</th>
+            <th>URL / Resource</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Customer portal (demo tenant)</td>
+            <td><code>https://demo.uat.delayedpaid.co.uk</code></td>
+          </tr>
+          <tr>
+            <td>Admin panel (demo tenant)</td>
+            <td><code>https://demo.uat.delayedpaid.co.uk/admin</code></td>
+          </tr>
+          <tr>
+            <td>Direct Container Apps URL</td>
+            <td><code>https://fdv2-uat-app.&lt;aca-env-domain&gt;.uksouth.azurecontainerapps.io</code></td>
+          </tr>
+          <tr>
+            <td>Resource group</td>
+            <td><code>fdv2-uat-rg</code> — Azure Portal → Resource Groups</td>
+          </tr>
+          <tr>
+            <td>Container App</td>
+            <td><code>fdv2-uat-app</code></td>
+          </tr>
+          <tr>
+            <td>Database server</td>
+            <td><code>fdv2-uat-postgres.postgres.database.azure.com</code> (private only)</td>
+          </tr>
+          <tr>
+            <td>Key Vault</td>
+            <td><code>fdv2-uat-keyvault.vault.azure.net</code> (private endpoint)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Production</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Purpose</th>
+            <th>URL / Resource</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Admin panel</td>
+            <td><code>https://admin.delayedpaid.co.uk</code></td>
+          </tr>
+          <tr>
+            <td>Customer portal (tenant example)</td>
+            <td><code>https://ergo.delayedpaid.co.uk</code></td>
+          </tr>
+          <tr>
+            <td>Container App</td>
+            <td><code>fdv2-app</code> in <code>fdv2-prod-rg</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warning">
+      <strong>UAT admin credentials:</strong> The UAT database is seeded independently from production. Use the superadmin account seeded during UAT setup. UAT and production admin credentials are not shared — changing one does not affect the other.
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>
