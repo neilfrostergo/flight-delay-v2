@@ -102,7 +102,8 @@ async function livePayment(tenant, { sortCode, accountNumber, amountPence, refer
  * @returns {Promise<{ success: boolean, modulrPaymentId: string|null, modulrReference: string|null, failureReason: string|null }>}
  */
 async function sendPayment(tenant, params) {
-  if (tenant.modulr_mode === 'live') {
+  const env = process.env.NODE_ENV;
+  if (tenant.modulr_mode === 'live' && env !== 'uat' && env !== 'development') {
     return livePayment(tenant, params);
   }
   return stubPayment(params);

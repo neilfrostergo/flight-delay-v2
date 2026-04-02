@@ -339,10 +339,10 @@ async function liveValidate(tenant, policyNumber, email) {
  * }>}
  */
 async function validatePolicy(tenant, policyNumber, email) {
-  if (tenant.policy_api_mode === 'live') {
+  const env = process.env.NODE_ENV;
+  if (tenant.policy_api_mode === 'live' && env !== 'uat' && env !== 'development') {
     return liveValidate(tenant, policyNumber, email);
   }
-  // Default to stub
   return stubValidate(policyNumber, email);
 }
 
