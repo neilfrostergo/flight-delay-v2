@@ -172,78 +172,37 @@ function stubValidate(policyNumber, email) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LIVE MODE — Ergo Connect API
-// POST {tenant.policy_api_url}/api/PolicySearch/getpolicy
-// Auth: OAuth2 password flow — POST /token → Bearer token (when policy_api_secret_enc set)
-//       Falls back to X-Api-Key header for tenants without a secret.
+// LIVE MODE — PolicyHub API
+// GET {tenant.policy_api_url}/api/policies/search?id=<policyNumber>
+// Auth: X-Api-Key header — key decrypted from tenant.policy_api_key_enc
 //
-// Production swap point: to integrate a different insurer's API, update only
-// the liveValidate() function below and adjust the field mapping.
+// Response structure:
+//   { success, hasData, data[0]: { clients[], scheme: { schemeCover[], policyType }, status, startDate, endDate } }
+//
+// status: 3 = Active
+// Cover benefits: scheme.schemeCover[] — find entry where sectionName includes cover_benefit_name
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Per-tenant token cache: slug → { token, expiresAt }
-const _tokenCache = new Map();
-
-async function getOauth2Token(tenant, username, password) {
-  const cached = _tokenCache.get(tenant.slug);
-  if (cached && Date.now() < cached.expiresAt) return cached.token;
-
-  const baseUrl = tenant.policy_api_url.replace(/\/$/, '').replace(/\/api\/.*$/, '');
-  const tokenUrl = `${baseUrl}/token`;
-
-  const body = new URLSearchParams({
-    grant_type: 'password',
-    username,
-    password,
-    scope: 'api',
-  });
-
-  const res = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-    signal: AbortSignal.timeout(10000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`OAuth2 token request failed: HTTP ${res.status}`);
-  }
-
-  const data = await res.json();
-  const token = data.access_token;
-  const expiresIn = (data.expires_in || 3600) * 1000;
-  _tokenCache.set(tenant.slug, { token, expiresAt: Date.now() + expiresIn - 60000 });
-  return token;
-}
+// Active status code in PolicyHub
+const POLICYHUB_STATUS_ACTIVE = 3;
 
 async function liveValidate(tenant, policyNumber, email) {
-  let authHeader;
+  let apiKey;
   try {
-    const username = decrypt(tenant.policy_api_key_enc);
-    if (tenant.policy_api_secret_enc) {
-      const password = decrypt(tenant.policy_api_secret_enc);
-      const token = await getOauth2Token(tenant, username, password);
-      authHeader = `Bearer ${token}`;
-    } else {
-      authHeader = `Bearer ${username}`;
-    }
+    apiKey = decrypt(tenant.policy_api_key_enc);
   } catch (err) {
-    console.error('[policyValidator] Auth setup failed for tenant', tenant.slug, err.message);
+    console.error('[policyValidator] Failed to decrypt API key for tenant', tenant.slug, err.message);
     return { valid: false, errorMessage: 'Policy validation service unavailable' };
   }
 
-  const baseUrl = tenant.policy_api_url.replace(/\/$/, '').replace(/\/api\/.*$/, '');
-  const url = `${baseUrl}/api/PolicySearch/getpolicy`;
+  const baseUrl = tenant.policy_api_url.replace(/\/$/, '');
+  const url = `${baseUrl}/api/policies/search?id=${encodeURIComponent(policyNumber)}`;
 
   let body;
   try {
     const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-      },
-      body: JSON.stringify({ policyNumber, pageSize: 1 }),
+      method: 'GET',
+      headers: { 'X-Api-Key': apiKey },
       signal: AbortSignal.timeout(10000),
     });
 
@@ -260,33 +219,34 @@ async function liveValidate(tenant, policyNumber, email) {
     return { valid: false, errorMessage: 'Policy validation service unavailable' };
   }
 
-  if (!body.statusissuccessful || !body.data || body.data.length === 0) {
+  if (!body.success || !body.hasData || !body.data || body.data.length === 0) {
     return { valid: false, errorMessage: 'Policy not found' };
   }
 
   const policy = body.data[0];
 
-  // Must be Active
-  if (policy.status !== 'Active') {
+  // Must be Active (status 3)
+  if (policy.status !== POLICYHUB_STATUS_ACTIVE) {
     return { valid: false, errorMessage: 'Policy is not active' };
   }
 
-  // Email must match (case-insensitive)
-  if (!policy.policyHolderEmailAddress ||
-      policy.policyHolderEmailAddress.toLowerCase() !== email.toLowerCase()) {
+  // Email must match the lead client (case-insensitive)
+  const leadClient = (policy.clients || []).find(c => c.relationshipId === 1) || policy.clients?.[0];
+  if (!leadClient?.email || leadClient.email.toLowerCase() !== email.toLowerCase()) {
     return { valid: false, errorMessage: 'Email address does not match policy records' };
   }
 
-  // Find the flight delay cover benefit
-  const benefitName = (tenant.cover_benefit_name || 'Flight Delay').toLowerCase();
-  const coverItem = (policy.cover || []).find(
-    (c) => c.name && c.name.toLowerCase().includes(benefitName)
+  // Find the flight delay cover benefit in scheme.schemeCover
+  const benefitName = (tenant.cover_benefit_name || 'delay').toLowerCase();
+  const schemeCover = policy.scheme?.schemeCover || [];
+  const coverItem = schemeCover.find(
+    (c) => c.sectionName && c.sectionName.toLowerCase().includes(benefitName)
   );
 
   if (!coverItem) {
     return {
       valid: false,
-      errorMessage: `No "${tenant.cover_benefit_name || 'Flight Delay'}" benefit found on this policy`,
+      errorMessage: `No "${tenant.cover_benefit_name || 'delay'}" benefit found on this policy`,
     };
   }
 
@@ -295,25 +255,25 @@ async function liveValidate(tenant, policyNumber, email) {
     return { valid: false, errorMessage: 'Benefit limit is zero — policy not eligible' };
   }
 
-  // Derive policy type from the product name
-  const product = (policy.product || '').toLowerCase();
+  // Derive policy type from scheme.policyType
+  const schemeType = (policy.scheme?.policyType || '').toLowerCase();
   let policyType = 'single_trip';
-  if (product.includes('amt') || product.includes('annual') || product.includes('multi')) {
+  if (schemeType.includes('annual') || schemeType.includes('multi')) {
     policyType = 'annual_multi_trip';
-  } else if (product.includes('return')) {
+  } else if (schemeType.includes('return')) {
     policyType = 'return_trip';
   }
 
   return {
     valid: true,
-    firstName:     policy.policyHolderFirstName || '',
-    lastName:      policy.policyHolderLastName  || '',
+    firstName:      leadClient.firstName || '',
+    lastName:       leadClient.lastName  || '',
     policyType,
-    travelers:     [{ firstName: policy.policyHolderFirstName || '', lastName: policy.policyHolderLastName || '' }],
+    travelers:      (policy.clients || []).map(c => ({ firstName: c.firstName || '', lastName: c.lastName || '' })),
     payoutPence,
     coverStartDate: policy.startDate || null,
     coverEndDate:   policy.endDate   || null,
-    rawResponse: body,
+    rawResponse:    body,
   };
 }
 
