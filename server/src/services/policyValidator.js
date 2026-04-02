@@ -203,7 +203,7 @@ async function liveValidate(tenant, policyNumber, email) {
     const res = await fetch(url, {
       method: 'GET',
       headers: { 'X-Api-Key': apiKey },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (res.status === 401) {
