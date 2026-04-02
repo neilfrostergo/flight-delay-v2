@@ -83,7 +83,7 @@ router.post('/', async (req, res) => {
   const { error, value } = tenantSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.details[0].message });
 
-  if (RESERVED_SLUGS.includes(value.slug)) {
+  if (RESERVED_SLUGS.includes(value.slug.toLowerCase())) {
     return res.status(400).json({ error: `Slug "${value.slug}" is reserved and cannot be used` });
   }
 
@@ -124,6 +124,10 @@ router.put('/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { error, value } = tenantSchema.validate(req.body, { allowUnknown: true });
   if (error) return res.status(400).json({ error: error.details[0].message });
+
+  if (value.slug && RESERVED_SLUGS.includes(value.slug.toLowerCase())) {
+    return res.status(400).json({ error: `Slug "${value.slug}" is reserved and cannot be used` });
+  }
 
   // Fetch existing row to preserve encrypted keys if not updated
   const existing = await query('SELECT policy_api_key_enc, policy_api_secret_enc, modulr_api_key_enc, slug FROM tenants WHERE id = $1', [id]);
