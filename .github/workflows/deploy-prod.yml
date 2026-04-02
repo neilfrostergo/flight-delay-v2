@@ -1,0 +1,55 @@
+name: Build and Deploy — Production
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write   # Required for OIDC login to Azure
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Run tests
+        run: npm test --if-present
+        working-directory: server
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        run: az acr login --name fdv2acr
+
+      - name: Build and push image to ACR
+        run: |
+          docker build -t fdv2acr.azurecr.io/fdv2-app:${{ github.sha }} -t fdv2acr.azurecr.io/fdv2-app:latest .
+          docker push fdv2acr.azurecr.io/fdv2-app:${{ github.sha }}
+          docker push fdv2acr.azurecr.io/fdv2-app:latest
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update \
+            --name fdv2-app \
+            --resource-group fdv2-prod-rg \
+            --image fdv2acr.azurecr.io/fdv2-app:${{ github.sha }}
