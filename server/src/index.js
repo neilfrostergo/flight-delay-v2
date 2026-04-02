@@ -44,6 +44,9 @@ const eventSource = require('./services/eventSource');
 
 const app = express();
 
+// Trust the first proxy hop (Azure Container Apps / Front Door)
+app.set('trust proxy', 1);
+
 // Health check — used by Front Door and Container Apps liveness probes
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

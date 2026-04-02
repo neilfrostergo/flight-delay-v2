@@ -1,8 +1,8 @@
-name: Build and Deploy
+name: Build and Deploy — UAT
 
 on:
   push:
-    branches: [main]
+    branches: [develop]
 
 permissions:
   id-token: write   # Required for OIDC login to Azure
@@ -43,13 +43,16 @@ jobs:
 
       - name: Build and push image to ACR
         run: |
-          docker build -t fdv2acr.azurecr.io/fdv2-app:${{ github.sha }} -t fdv2acr.azurecr.io/fdv2-app:latest .
-          docker push fdv2acr.azurecr.io/fdv2-app:${{ github.sha }}
-          docker push fdv2acr.azurecr.io/fdv2-app:latest
+          docker build \
+            -t fdv2acr.azurecr.io/fdv2-app:develop-${{ github.sha }} \
+            -t fdv2acr.azurecr.io/fdv2-app:develop-latest \
+            .
+          docker push fdv2acr.azurecr.io/fdv2-app:develop-${{ github.sha }}
+          docker push fdv2acr.azurecr.io/fdv2-app:develop-latest
 
-      - name: Deploy to Container Apps
+      - name: Deploy to UAT Container App
         run: |
           az containerapp update \
-            --name fdv2-app \
-            --resource-group fdv2-prod-rg \
-            --image fdv2acr.azurecr.io/fdv2-app:${{ github.sha }}
+            --name fdv2-uat-app \
+            --resource-group fdv2-uat-rg \
+            --image fdv2acr.azurecr.io/fdv2-app:develop-${{ github.sha }}
