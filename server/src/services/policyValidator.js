@@ -300,7 +300,7 @@ async function liveValidate(tenant, policyNumber, email) {
  */
 async function validatePolicy(tenant, policyNumber, email) {
   const env = process.env.NODE_ENV;
-  if (tenant.policy_api_mode === 'live' && env !== 'uat' && env !== 'development') {
+  if (tenant.policy_api_mode === 'live' && env !== 'development') {
     return liveValidate(tenant, policyNumber, email);
   }
   return stubValidate(policyNumber, email);
