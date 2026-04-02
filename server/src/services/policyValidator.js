@@ -196,7 +196,10 @@ async function liveValidate(tenant, policyNumber, email) {
   }
 
   const baseUrl = tenant.policy_api_url.replace(/\/$/, '');
-  const url = `${baseUrl}/api/policies/search?id=${encodeURIComponent(policyNumber)}`;
+  const coverHolderParam = tenant.policy_api_coverholder_key
+    ? `&coverHolderKey=${encodeURIComponent(tenant.policy_api_coverholder_key)}`
+    : '';
+  const url = `${baseUrl}/api/policies/search?id=${encodeURIComponent(policyNumber)}${coverHolderParam}`;
 
   let body;
   try {

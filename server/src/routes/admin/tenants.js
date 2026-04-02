@@ -23,6 +23,7 @@ const tenantSchema = Joi.object({
   policy_api_key:          Joi.string().max(500).allow('', null).optional(), // plaintext — will be encrypted
   policy_api_secret:       Joi.string().max(500).allow('', null).optional(), // plaintext — will be encrypted
   policy_api_mode:         Joi.string().valid('stub', 'live').optional(),
+  policy_api_coverholder_key: Joi.string().trim().max(200).allow('', null).optional(),
   cover_benefit_name:      Joi.string().trim().max(100).allow('', null).optional(),
   modulr_account_id:       Joi.string().trim().max(100).allow('', null).optional(),
   modulr_api_key:          Joi.string().max(500).allow('', null).optional(), // plaintext — will be encrypted
@@ -42,7 +43,7 @@ router.get('/', async (_req, res) => {
   const result = await query(
     `SELECT id, slug, name, subdomain, logo_url, primary_colour, terms_url, support_email,
             claim_url, register_claim_url, my_account_url,
-            policy_api_url, policy_api_mode, cover_benefit_name,
+            policy_api_url, policy_api_mode, policy_api_coverholder_key, cover_benefit_name,
             modulr_account_id, modulr_mode,
             token_ttl_days, delay_threshold_minutes, min_hours_before_dep, max_days_before_dep,
             portal_label, is_active, created_at, updated_at
@@ -56,7 +57,7 @@ router.get('/:id', async (req, res) => {
   const result = await query(
     `SELECT id, slug, name, subdomain, logo_url, primary_colour, terms_url, support_email,
             claim_url, register_claim_url, my_account_url,
-            policy_api_url, policy_api_mode, cover_benefit_name,
+            policy_api_url, policy_api_mode, policy_api_coverholder_key, cover_benefit_name,
             modulr_account_id, modulr_mode,
             token_ttl_days, delay_threshold_minutes, min_hours_before_dep, max_days_before_dep,
             portal_label, is_active, created_at, updated_at
@@ -91,11 +92,11 @@ router.post('/', async (req, res) => {
     `INSERT INTO tenants
        (slug, name, subdomain, logo_url, primary_colour, terms_url, support_email,
         claim_url, register_claim_url, my_account_url,
-        policy_api_url, policy_api_key_enc, policy_api_mode, cover_benefit_name,
+        policy_api_url, policy_api_key_enc, policy_api_mode, policy_api_coverholder_key, cover_benefit_name,
         modulr_account_id, modulr_api_key_enc, modulr_mode,
         token_ttl_days, delay_threshold_minutes, min_hours_before_dep, max_days_before_dep,
         portal_label)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
      RETURNING id, slug, name`,
     [
       value.slug, value.name, value.subdomain,
@@ -105,6 +106,7 @@ router.post('/', async (req, res) => {
       value.policy_api_url || null,
       value.policy_api_key ? encrypt(value.policy_api_key) : null,
       value.policy_api_mode || 'stub',
+      value.policy_api_coverholder_key || null,
       value.cover_benefit_name || 'Flight Delay',
       value.modulr_account_id || null,
       value.modulr_api_key ? encrypt(value.modulr_api_key) : null,
@@ -143,16 +145,18 @@ router.put('/:id', async (req, res) => {
        slug=$1, name=$2, subdomain=$3, logo_url=$4, primary_colour=$5,
        terms_url=$6, support_email=$7, claim_url=$8, register_claim_url=$9, my_account_url=$10,
        policy_api_url=$11, policy_api_key_enc=$12, policy_api_secret_enc=$13, policy_api_mode=$14,
-       cover_benefit_name=$15, modulr_account_id=$16, modulr_api_key_enc=$17, modulr_mode=$18,
-       token_ttl_days=$19, delay_threshold_minutes=$20, min_hours_before_dep=$21,
-       max_days_before_dep=$22, portal_label=$23, is_active=$24, updated_at=NOW()
-     WHERE id=$25`,
+       policy_api_coverholder_key=$15, cover_benefit_name=$16,
+       modulr_account_id=$17, modulr_api_key_enc=$18, modulr_mode=$19,
+       token_ttl_days=$20, delay_threshold_minutes=$21, min_hours_before_dep=$22,
+       max_days_before_dep=$23, portal_label=$24, is_active=$25, updated_at=NOW()
+     WHERE id=$26`,
     [
       value.slug || prev.slug, value.name, value.subdomain,
       value.logo_url || null, value.primary_colour || '#1a56db',
       value.terms_url || null, value.support_email || null,
       value.claim_url || null, value.register_claim_url || null, value.my_account_url || null,
       value.policy_api_url || null, policyKeyEnc, policySecretEnc, value.policy_api_mode || 'stub',
+      value.policy_api_coverholder_key || null,
       value.cover_benefit_name || 'Flight Delay',
       value.modulr_account_id || null, modulrKeyEnc, value.modulr_mode || 'stub',
       value.token_ttl_days || 7, value.delay_threshold_minutes || 180,
