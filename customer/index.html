@@ -828,6 +828,62 @@
 
     .portal-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
 
+    .portal-type-badge {
+      display: inline-block;
+      background: var(--brand);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      letter-spacing: .03em;
+    }
+
+    .portal-payout-context {
+      display: block;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .portal-cover-summary {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .portal-cover-summary summary::-webkit-details-marker { display: none; }
+    .portal-cover-summary summary { outline: none; }
+
+    .portal-cover-table {
+      margin-top: 12px;
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .portal-cover-table th {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      text-align: left;
+      padding: 4px 6px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .portal-cover-table td {
+      padding: 7px 6px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .portal-cover-table tr:last-child td { border-bottom: none; }
+    .portal-cover-table .cover-name  { font-weight: 600; }
+    .portal-cover-table .cover-limit { font-weight: 700; white-space: nowrap; }
+    .portal-cover-table .cover-excess { color: var(--muted); white-space: nowrap; }
+
     .portal-flight-card {
       background: var(--white);
       border: 1px solid var(--border);
@@ -2123,6 +2179,9 @@ async function submitRegistration() {
         bank_sort_code:          sc,
         bank_account:            ac,
         pre_validation_token_id: v.tokenId || null,
+        policy_type:             v.policyType   || null,
+        travelers:               v.travelers    || null,
+        cover_summary:           v.coverSummary || null,
         flights: state.basket.map(f => ({
           flight_number:      f.flightNumber,
           carrier_code:       f.carrierCode || f.flightNumber.match(/^[A-Z]{2,3}/)?.[0] || '',
@@ -2498,8 +2557,61 @@ function renderPortalDash(reg) {
   const addBtn = document.getElementById('portal-add-toggle-btn');
   if (addBtn) addBtn.style.display = reg.id ? '' : 'none';
 
+  // Format policyType as a human-readable badge label
+  const policyTypeLabelMap = {
+    annual_multi_trip: 'Annual Multi-Trip',
+    single_trip:       'Single Trip',
+    return_trip:       'Return Trip',
+  };
+  const policyTypeLabel = policyTypeLabelMap[reg.policy_type] || null;
+
+  // Format a monetary limit value: £10M, £2M, £1M, or £X,XXX
+  function fmtCoverLimit(amount) {
+    if (!amount && amount !== 0) return '—';
+    if (amount >= 1000000) return '£' + (amount / 1000000) + 'M';
+    return '£' + amount.toLocaleString('en-GB');
+  }
+
+  // Build travelers list HTML
+  const travelers = reg.travelers || null;
+  const travelersHtml = travelers && travelers.length
+    ? travelers.map(t => escHtml(`${t.firstName || ''} ${t.lastName || ''}`.trim())).join(', ')
+    : null;
+
+  // Build cover summary HTML
+  const coverSummary = reg.cover_summary || null;
+  const coverSummaryHtml = coverSummary && coverSummary.length
+    ? `<details class="portal-cover-summary">
+        <summary class="portal-section-title" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px">
+          Your cover summary <span style="font-weight:400;font-size:11px;letter-spacing:0;text-transform:none">▸</span>
+        </summary>
+        <table class="portal-cover-table">
+          <thead>
+            <tr>
+              <th>Benefit</th>
+              <th>Limit</th>
+              <th>Excess</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${coverSummary.map(c => `
+              <tr>
+                <td class="cover-name">${escHtml(c.name || '')}${c.description ? `<br><span style="font-size:11px;font-weight:400;color:var(--muted)">${escHtml(c.description)}</span>` : ''}</td>
+                <td class="cover-limit">${fmtCoverLimit(c.limit)}</td>
+                <td class="cover-excess">${c.excess ? '£' + c.excess : 'Nil'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </details>`
+    : '';
+
   document.getElementById('portal-reg-summary').innerHTML = `
     <div class="portal-summary-card">
+      ${policyTypeLabel ? `
+      <div class="portal-summary-row">
+        <span class="portal-summary-label">Policy type</span>
+        <span class="portal-summary-value"><span class="portal-type-badge">${escHtml(policyTypeLabel)}</span></span>
+      </div>` : ''}
       <div class="portal-summary-row">
         <span class="portal-summary-label">Policy number</span>
         <span class="portal-summary-value" style="font-family:'Courier New',monospace;color:var(--brand)">${escHtml(reg.policy_number)}</span>
@@ -2514,10 +2626,19 @@ function renderPortalDash(reg) {
         <span class="portal-summary-value">${fmtDate(reg.cover_start_date)} – ${fmtDate(reg.cover_end_date)}</span>
       </div>` : ''}
       <div class="portal-summary-row">
-        <span class="portal-summary-label">Payout value</span>
-        <span class="portal-summary-value">£${(reg.payout_pence / 100).toFixed(2)}</span>
+        <span class="portal-summary-label">Delay payout</span>
+        <span class="portal-summary-value">
+          £${(reg.payout_pence / 100).toFixed(2)} per person
+          <span class="portal-payout-context">payable after a qualifying 12-hour delay</span>
+        </span>
       </div>
-    </div>`;
+      ${travelersHtml ? `
+      <div class="portal-summary-row">
+        <span class="portal-summary-label">Travelers</span>
+        <span class="portal-summary-value">${travelersHtml}</span>
+      </div>` : ''}
+    </div>
+    ${coverSummaryHtml}`;
 
   if (!reg.flights || reg.flights.length === 0) {
     document.getElementById('portal-flights-list').innerHTML = `

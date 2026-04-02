@@ -1,0 +1,2038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Delay v2 — Architecture Reference</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --bg2:       #161b22;
+    --bg3:       #21262d;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --text-muted:#8b949e;
+    --blue:      #58a6ff;
+    --green:     #3fb950;
+    --yellow:    #d29922;
+    --red:       #f85149;
+    --purple:    #bc8cff;
+    --orange:    #e3b341;
+    --teal:      #39d353;
+    --accent:    #1f6feb;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Layout ── */
+  .sidebar {
+    position: fixed;
+    top: 44px; left: 0;
+    width: 220px;
+    height: calc(100vh - 44px);
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 0;
+    z-index: 100;
+  }
+
+  .sidebar-logo {
+    padding: 0 16px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+
+  .sidebar-logo .product {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .sidebar-logo .doc-type {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .sidebar nav a {
+    display: block;
+    padding: 6px 16px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .sidebar nav a:hover,
+  .sidebar nav a.active {
+    color: var(--blue);
+    border-left-color: var(--blue);
+    background: rgba(88,166,255,0.06);
+  }
+
+  .sidebar nav .section-label {
+    padding: 14px 16px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  main {
+    margin-left: 220px;
+    padding: 80px 56px 48px;
+    max-width: 1200px;
+  }
+
+  /* ── Typography ── */
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--blue);
+    margin: 28px 0 10px;
+  }
+
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 20px 0 8px;
+  }
+
+  p { margin-bottom: 12px; color: var(--text); }
+
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--orange);
+  }
+
+  pre {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 12px 0 20px;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  /* ── Cards & Boxes ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-blue   { background: rgba(88,166,255,0.15);   color: var(--blue);   }
+  .badge-green  { background: rgba(63,185,80,0.15);    color: var(--green);  }
+  .badge-yellow { background: rgba(210,153,34,0.15);   color: var(--yellow); }
+  .badge-red    { background: rgba(248,81,73,0.15);    color: var(--red);    }
+  .badge-purple { background: rgba(188,140,255,0.15);  color: var(--purple); }
+  .badge-orange { background: rgba(227,179,65,0.15);   color: var(--orange); }
+
+  /* ── Tables ── */
+  .table-wrap {
+    overflow-x: auto;
+    margin-bottom: 24px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    background: var(--bg3);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── Diagrams ── */
+  .diagram-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px 0 32px;
+    overflow-x: auto;
+  }
+
+  svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  /* ── Runbook steps ── */
+  .steps { list-style: none; counter-reset: step; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 12px 16px 12px 52px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px; height: 24px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 24px;
+    text-align: center;
+  }
+
+  /* ── Alert / callout ── */
+  .callout {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 12px 0 20px;
+    font-size: 13px;
+    border-left: 3px solid;
+  }
+  .callout-info    { background: rgba(88,166,255,0.08);   border-color: var(--blue);   color: var(--text); }
+  .callout-warning { background: rgba(210,153,34,0.1);    border-color: var(--yellow); color: var(--text); }
+  .callout-danger  { background: rgba(248,81,73,0.08);    border-color: var(--red);    color: var(--text); }
+
+  /* ── Page header ── */
+  .page-header {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .meta-row span { display: flex; align-items: center; gap: 6px; }
+
+  /* ── Section anchor ── */
+  section { scroll-margin-top: 68px; }
+
+  /* ── Top navigation bar ── */
+  .topnav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 200;
+  }
+  .topnav-brand {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+    margin-right: 24px;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .topnav-links {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+  }
+  .topnav-links a {
+    padding: 4px 10px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .topnav-links a:hover,
+  .topnav-links a.current {
+    color: var(--text);
+    background: rgba(255,255,255,0.06);
+  }
+  .topnav-links a.current { color: var(--blue); }
+  .topnav-print {
+    margin-left: auto;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .topnav-print:hover { background: #388bfd; }
+
+  /* ── Print / Save as PDF ── */
+  @media print {
+    .topnav  { display: none !important; }
+    .sidebar { display: none !important; }
+    main { margin-left: 0 !important; padding: 24px 32px !important; max-width: 100% !important; }
+    body { background: #fff !important; }
+    h1, h2, h3, h4, p, td, li { color: #1a1a2e !important; }
+    h3 { color: #1f6feb !important; }
+    h2 { border-bottom-color: #ddd !important; }
+    code { background: #f6f8fa !important; border-color: #ddd !important; color: #c7254e !important; }
+    pre { background: #f6f8fa !important; border-color: #ddd !important; }
+    pre code { color: #333 !important; }
+    th { background: #f6f8fa !important; color: #555 !important; }
+    td { border-bottom-color: #eee !important; }
+    .stat-card, .card, .diagram-wrap { background: #f6f8fa !important; border-color: #ddd !important; }
+    .callout-info    { background: #e8f4fd !important; border-color: #1f6feb !important; }
+    .callout-warning { background: #fffbeb !important; border-color: #d29922 !important; }
+    .callout-success { background: #f0fdf4 !important; border-color: #3fb950 !important; }
+    .callout-danger  { background: #fef2f2 !important; border-color: #f85149 !important; }
+    .steps li { background: #f6f8fa !important; border-color: #ddd !important; }
+    .steps li::before { background: #1f6feb !important; }
+    a { color: #1f6feb !important; }
+    .page-header { border-bottom-color: #ddd !important; }
+    .meta-row { color: #555 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <a class="topnav-brand" href="index.html">Flight Delay v2</a>
+  <div class="topnav-links">
+    <a href="index.html">Home</a>
+    <a href="architecture.html" class="current">Architecture</a>
+    <a href="environments.html">Environments</a>
+    <a href="development.html">Development</a>
+  </div>
+  <button class="topnav-print" onclick="window.print()">Save as PDF</button>
+</div>
+
+<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="product">Flight Delay v2</div>
+    <div class="doc-type">Architecture Reference</div>
+  </div>
+  <nav>
+    <div class="section-label">Overview</div>
+    <a href="#overview">Platform Overview</a>
+    <a href="#resources">Azure Resources</a>
+
+    <div class="section-label">Diagrams</div>
+    <a href="#network">Network Topology</a>
+    <a href="#layer4">Layer 4 — Transport &amp; Ports</a>
+    <a href="#traffic-flow">Traffic Flow</a>
+    <a href="#external-integrations">External Integrations</a>
+    <a href="#app-arch">Application Architecture</a>
+    <a href="#cicd">CI/CD Pipeline</a>
+
+    <div class="section-label">Reference</div>
+    <a href="#security">Security Controls</a>
+    <a href="#credentials">Credentials &amp; Endpoints</a>
+
+    <div class="section-label">Operations</div>
+    <a href="#runbook">Runbook</a>
+    <a href="#troubleshooting">Troubleshooting</a>
+  </nav>
+</aside>
+
+<!-- ══════════════════════ MAIN ══════════════════════ -->
+<main>
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <h1>Flight Delay v2 — Architecture Reference</h1>
+    <div class="meta-row">
+      <span>Region: <strong>UK South</strong></span>
+      <span>Resource Group: <code>fdv2-prod-rg</code></span>
+      <span>Runtime: <strong>Node.js 20 / Express 5 / PostgreSQL 16</strong></span>
+      <span>Last updated: <strong>2026-04-01</strong></span>
+      <span><span class="badge badge-yellow">Internal use only</span></span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 1. OVERVIEW ═══════════════════ -->
+  <section id="overview">
+    <h2>1. Platform Overview</h2>
+
+    <p>
+      Flight Delay v2 is a multi-tenant SaaS platform that automates insurance payouts when a
+      covered flight is delayed or cancelled beyond a configurable threshold. Each insurer brand
+      (tenant) gets its own subdomain, white-labeled customer portal, policy validation configuration,
+      and Modulr Faster Payments account. A single Express application serves all tenants; tenant
+      context is resolved from the <code>Host</code> header at every request.
+    </p>
+
+    <div class="card-grid">
+      <div class="stat-card">
+        <div class="label">Architecture pattern</div>
+        <div class="value">Multi-tenant SaaS</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Compute</div>
+        <div class="value">Azure Container Apps</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Replicas</div>
+        <div class="value">1 – 5 (HTTP scale)</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Database</div>
+        <div class="value">PostgreSQL 16 (private)</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Edge / WAF</div>
+        <div class="value">Azure Front Door Premium</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Event ingestion</div>
+        <div class="value">Azure Event Hub</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Egress IP</div>
+        <div class="value">20.50.124.92 (static)</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">DNS zone</div>
+        <div class="value">delayedpaid.co.uk</div>
+      </div>
+    </div>
+
+    <h3>Key design principles</h3>
+    <ul style="margin-left:20px;line-height:2">
+      <li>No public IP on the application — Container Apps accepts traffic only from Front Door via Private Link.</li>
+      <li>All secrets stored in Azure Key Vault; accessed by the container via Managed Identity — no secrets in environment variables in production.</li>
+      <li>All inter-service traffic stays inside the VNet (<code>10.100.0.0/16</code>) or over Private Endpoints.</li>
+      <li>Monetary values are always integer pence — no floating point.</li>
+      <li>Bank details (sort code, account number) are AES-256-GCM encrypted at rest; decrypted only inside <code>delayProcessor.js</code> immediately before a Modulr payout.</li>
+      <li>OAG flight subscriptions are global — shared across tenants watching the same flight.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════ 1b. AZURE RESOURCES ═══════════════════ -->
+  <section id="resources">
+    <h2>2. Azure Resources</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>Name</th>
+            <th>SKU / Tier</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Virtual Network</td><td><code>fdv2-vnet</code></td><td>—</td><td>10.100.0.0/16, UK South</td></tr>
+          <tr><td>Container Apps Environment</td><td><code>fdv2-aca-env</code></td><td>Consumption</td><td>VNet-integrated, external ingress; Private Link origin for Front Door</td></tr>
+          <tr><td>Container App</td><td><code>fdv2-app</code></td><td>—</td><td>1–5 replicas, HTTP scale; image from <code>fdv2acr</code></td></tr>
+          <tr><td>Container Registry</td><td><code>fdv2acr</code></td><td>Basic</td><td>Private; pull via Managed Identity</td></tr>
+          <tr><td>PostgreSQL Flexible Server</td><td><code>fdv2-postgres</code></td><td>General Purpose D2s_v3</td><td>Private IP 10.100.8.5; VNet-injected into <code>fdv2-data-subnet</code></td></tr>
+          <tr><td>Azure Key Vault</td><td><code>fdv2-keyvault</code></td><td>Standard</td><td>Private endpoint 10.100.9.x; no public access</td></tr>
+          <tr><td>Event Hub Namespace</td><td><code>fdv2-eventhub</code></td><td>Standard, 2 TU</td><td>Public access disabled; private endpoint 10.100.9.5</td></tr>
+          <tr><td>Event Hub</td><td><code>oag-flight-alerts</code></td><td>4 partitions</td><td>OAG pushes flight events here</td></tr>
+          <tr><td>Storage Account</td><td><code>fdv2prodsa</code></td><td>—</td><td>Event Hub checkpoint container</td></tr>
+          <tr><td>Front Door</td><td><code>fdv2-frontdoor</code></td><td>Premium</td><td>WAF OWASP 2.1, Prevention mode; Private Link to ACA</td></tr>
+          <tr><td>Front Door Endpoint</td><td colspan="2"><code>fdv2-endpoint-b7fsdzfedegeh8dv.a03.azurefd.net</code></td><td>Base endpoint for DNS CNAME</td></tr>
+          <tr><td>NAT Gateway</td><td><code>fdv2-nat-gateway</code></td><td>—</td><td>Static egress IP 20.50.124.92</td></tr>
+          <tr><td>Azure Communication Services</td><td><code>fdv2-comms</code></td><td>—</td><td>SMTP relay smtp.azurecomm.net for customer emails</td></tr>
+          <tr><td>Log Analytics Workspace</td><td><code>fdv2-logs</code></td><td>—</td><td>90-day retention</td></tr>
+          <tr><td>Application Insights</td><td><code>fdv2-appinsights</code></td><td>—</td><td>Request tracing, perf monitoring</td></tr>
+          <tr><td>Managed Identity</td><td><code>fdv2-identity</code></td><td>User-assigned</td><td>Used by container to access Key Vault and ACR</td></tr>
+          <tr><td>DNS Zone</td><td><code>delayedpaid.co.uk</code></td><td>—</td><td>Pending nameserver propagation; wildcard CNAME → Front Door endpoint</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>VNet Subnets</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Subnet</th><th>Name</th><th>CIDR</th><th>Contents</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Container Apps</td><td><code>fdv2-aca-subnet</code></td><td><code>10.100.0.0/21</code></td><td>ACA environment (large /21 required by ACA)</td></tr>
+          <tr><td>Data</td><td><code>fdv2-data-subnet</code></td><td><code>10.100.8.0/24</code></td><td>PostgreSQL Flexible Server (10.100.8.5)</td></tr>
+          <tr><td>Private Endpoints</td><td><code>fdv2-pe-subnet</code></td><td><code>10.100.9.0/24</code></td><td>Key Vault PE + Event Hub PE (10.100.9.5)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 2. NETWORK TOPOLOGY ═══════════════════ -->
+  <section id="network">
+    <h2>3. Network Topology Diagram</h2>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 1000 700" width="100%" xmlns="http://www.w3.org/2000/svg" style="max-width:1000px;display:block;margin:auto">
+        <defs>
+          <!-- Arrow markers -->
+          <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+          </marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#3fb950"/>
+          </marker>
+          <marker id="arrow-orange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#e3b341"/>
+          </marker>
+          <marker id="arrow-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#bc8cff"/>
+          </marker>
+          <marker id="arrow-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#f85149"/>
+          </marker>
+        </defs>
+
+        <!-- ── Background ── -->
+        <rect width="1000" height="700" fill="#161b22"/>
+
+        <!-- ── Internet zone (left) ── -->
+        <rect x="10" y="10" width="140" height="680" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="80" y="32" fill="#8b949e" font-size="10" text-anchor="middle" font-weight="600" letter-spacing="1">INTERNET</text>
+
+        <!-- Browser -->
+        <rect x="24" y="50" width="112" height="52" rx="6" fill="#21262d" stroke="#30363d"/>
+        <text x="80" y="72" fill="#e6edf3" font-size="11" text-anchor="middle" font-weight="600">Browser</text>
+        <text x="80" y="88" fill="#8b949e" font-size="9.5" text-anchor="middle">*.delayedpaid.co.uk</text>
+
+        <!-- OAG -->
+        <rect x="24" y="330" width="112" height="52" rx="6" fill="#21262d" stroke="#30363d"/>
+        <text x="80" y="352" fill="#e6edf3" font-size="11" text-anchor="middle" font-weight="600">OAG</text>
+        <text x="80" y="368" fill="#8b949e" font-size="9.5" text-anchor="middle">Flight alerts</text>
+
+        <!-- Modulr -->
+        <rect x="24" y="440" width="112" height="52" rx="6" fill="#21262d" stroke="#30363d"/>
+        <text x="80" y="462" fill="#e6edf3" font-size="11" text-anchor="middle" font-weight="600">Modulr</text>
+        <text x="80" y="478" fill="#8b949e" font-size="9.5" text-anchor="middle">Faster Payments</text>
+
+        <!-- GitHub -->
+        <rect x="24" y="560" width="112" height="52" rx="6" fill="#21262d" stroke="#30363d"/>
+        <text x="80" y="582" fill="#e6edf3" font-size="11" text-anchor="middle" font-weight="600">GitHub</text>
+        <text x="80" y="598" fill="#8b949e" font-size="9.5" text-anchor="middle">neilfrostergo/fdv2</text>
+
+        <!-- ── Front Door (edge) ── -->
+        <rect x="175" y="30" width="155" height="88" rx="8" fill="#1c2540" stroke="#1f6feb" stroke-width="1.5"/>
+        <text x="252" y="55" fill="#58a6ff" font-size="11" text-anchor="middle" font-weight="700">Front Door Premium</text>
+        <text x="252" y="72" fill="#8b949e" font-size="9" text-anchor="middle">fdv2-frontdoor</text>
+        <text x="252" y="87" fill="#8b949e" font-size="9" text-anchor="middle">WAF OWASP 2.1 · Prevention</text>
+        <text x="252" y="104" fill="#3fb950" font-size="9" text-anchor="middle">DDoS Standard · Global anycast</text>
+
+        <!-- ── Azure VNet box ── -->
+        <rect x="175" y="140" width="720" height="540" rx="10" fill="#0d1117" stroke="#1f6feb" stroke-width="1.5" stroke-dasharray="6,3"/>
+        <text x="535" y="162" fill="#1f6feb" font-size="11" text-anchor="middle" font-weight="700" letter-spacing="1">AZURE VNET — fdv2-vnet   10.100.0.0/16   UK South   (fdv2-prod-rg)</text>
+
+        <!-- ── ACA Subnet ── -->
+        <rect x="192" y="175" width="320" height="190" rx="8" fill="#131c2e" stroke="#58a6ff" stroke-width="1" stroke-dasharray="5,3"/>
+        <text x="352" y="193" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="600">fdv2-aca-subnet   10.100.0.0/21</text>
+
+        <!-- ACA Environment box -->
+        <rect x="204" y="203" width="296" height="148" rx="6" fill="#1a2332" stroke="#30363d"/>
+        <text x="352" y="221" fill="#e6edf3" font-size="10" text-anchor="middle" font-weight="600">Container Apps Environment — fdv2-aca-env</text>
+
+        <!-- Container App -->
+        <rect x="218" y="232" width="268" height="106" rx="5" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="352" y="251" fill="#58a6ff" font-size="11" text-anchor="middle" font-weight="700">fdv2-app</text>
+        <text x="352" y="267" fill="#8b949e" font-size="9" text-anchor="middle">Node.js 20 · Express 5</text>
+        <text x="352" y="281" fill="#8b949e" font-size="9" text-anchor="middle">PORT 3000 · 1–5 replicas (HTTP scale)</text>
+        <text x="352" y="298" fill="#e3b341" font-size="9" text-anchor="middle">Image: fdv2acr.azurecr.io/fdv2-app:latest</text>
+        <text x="352" y="313" fill="#8b949e" font-size="9" text-anchor="middle">Managed Identity: fdv2-identity</text>
+        <text x="352" y="328" fill="#8b949e" font-size="9" text-anchor="middle">NAT Gateway egress → 20.50.124.92</text>
+
+        <!-- ── Data Subnet ── -->
+        <rect x="192" y="382" width="320" height="118" rx="8" fill="#13231a" stroke="#3fb950" stroke-width="1" stroke-dasharray="5,3"/>
+        <text x="352" y="400" fill="#3fb950" font-size="10" text-anchor="middle" font-weight="600">fdv2-data-subnet   10.100.8.0/24</text>
+
+        <!-- PostgreSQL -->
+        <rect x="218" y="410" width="268" height="74" rx="5" fill="#21262d" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="352" y="430" fill="#3fb950" font-size="11" text-anchor="middle" font-weight="700">fdv2-postgres</text>
+        <text x="352" y="446" fill="#8b949e" font-size="9" text-anchor="middle">PostgreSQL 16 Flexible Server</text>
+        <text x="352" y="460" fill="#8b949e" font-size="9" text-anchor="middle">Private IP: 10.100.8.5  ·  No public endpoint</text>
+        <text x="352" y="474" fill="#8b949e" font-size="9" text-anchor="middle">DNS: postgres.database.azure.com A→10.100.8.5</text>
+
+        <!-- ── Private Endpoints Subnet ── -->
+        <rect x="546" y="175" width="332" height="404" rx="8" fill="#1e1a2e" stroke="#bc8cff" stroke-width="1" stroke-dasharray="5,3"/>
+        <text x="712" y="193" fill="#bc8cff" font-size="10" text-anchor="middle" font-weight="600">fdv2-pe-subnet   10.100.9.0/24</text>
+
+        <!-- Key Vault -->
+        <rect x="562" y="205" width="300" height="78" rx="5" fill="#21262d" stroke="#bc8cff" stroke-width="1.5"/>
+        <text x="712" y="228" fill="#bc8cff" font-size="11" text-anchor="middle" font-weight="700">fdv2-keyvault</text>
+        <text x="712" y="244" fill="#8b949e" font-size="9" text-anchor="middle">Azure Key Vault (Standard)</text>
+        <text x="712" y="260" fill="#8b949e" font-size="9" text-anchor="middle">Private endpoint only · No public access</text>
+        <text x="712" y="275" fill="#e3b341" font-size="9" text-anchor="middle">Secrets: DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY, SMTP_*, EH_*</text>
+
+        <!-- Event Hub PE -->
+        <rect x="562" y="300" width="300" height="78" rx="5" fill="#21262d" stroke="#bc8cff" stroke-width="1.5"/>
+        <text x="712" y="323" fill="#bc8cff" font-size="11" text-anchor="middle" font-weight="700">fdv2-eventhub</text>
+        <text x="712" y="339" fill="#8b949e" font-size="9" text-anchor="middle">Event Hub NS · Standard · 2 TU</text>
+        <text x="712" y="355" fill="#8b949e" font-size="9" text-anchor="middle">oag-flight-alerts (4 partitions)</text>
+        <text x="712" y="371" fill="#e3b341" font-size="9" text-anchor="middle">Private endpoint: 10.100.9.5  ·  Public access disabled</text>
+
+        <!-- ACR -->
+        <rect x="562" y="395" width="300" height="68" rx="5" fill="#21262d" stroke="#e3b341" stroke-width="1.5"/>
+        <text x="712" y="418" fill="#e3b341" font-size="11" text-anchor="middle" font-weight="700">fdv2acr</text>
+        <text x="712" y="434" fill="#8b949e" font-size="9" text-anchor="middle">Azure Container Registry (Basic)</text>
+        <text x="712" y="450" fill="#8b949e" font-size="9" text-anchor="middle">Private pull · Managed Identity auth</text>
+
+        <!-- NAT Gateway (inside VNet, bottom) -->
+        <rect x="192" y="515" width="320" height="58" rx="6" fill="#21262d" stroke="#f85149" stroke-width="1.5"/>
+        <text x="352" y="539" fill="#f85149" font-size="11" text-anchor="middle" font-weight="700">fdv2-nat-gateway</text>
+        <text x="352" y="556" fill="#8b949e" font-size="9" text-anchor="middle">Static public IP: 20.50.124.92  ·  All Container Apps egress</text>
+
+        <!-- ACS -->
+        <rect x="562" y="478" width="300" height="58" rx="5" fill="#21262d" stroke="#39d353" stroke-width="1.5"/>
+        <text x="712" y="502" fill="#39d353" font-size="11" text-anchor="middle" font-weight="700">fdv2-comms</text>
+        <text x="712" y="518" fill="#8b949e" font-size="9" text-anchor="middle">Azure Communication Services</text>
+        <text x="712" y="531" fill="#8b949e" font-size="9" text-anchor="middle">SMTP relay · smtp.azurecomm.net</text>
+
+        <!-- Log Analytics / App Insights -->
+        <rect x="562" y="548" width="300" height="68" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="712" y="571" fill="#e6edf3" font-size="11" text-anchor="middle" font-weight="600">Monitoring</text>
+        <text x="712" y="587" fill="#8b949e" font-size="9" text-anchor="middle">fdv2-logs (Log Analytics, 90d)</text>
+        <text x="712" y="601" fill="#8b949e" font-size="9" text-anchor="middle">fdv2-appinsights (Application Insights)</text>
+
+        <!-- ── Traffic flow arrows ── -->
+
+        <!-- Browser → Front Door (HTTPS) -->
+        <line x1="136" y1="76" x2="173" y2="76" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+        <text x="154" y="70" fill="#58a6ff" font-size="8" text-anchor="middle">HTTPS</text>
+
+        <!-- Front Door → ACA (Private Link) -->
+        <line x1="252" y1="118" x2="252" y2="200" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-blue)" stroke-dasharray="5,3"/>
+        <text x="268" y="160" fill="#58a6ff" font-size="8">Private Link</text>
+
+        <!-- ACA → PostgreSQL -->
+        <line x1="352" y1="350" x2="352" y2="408" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+        <text x="368" y="382" fill="#3fb950" font-size="8">VNet (5432)</text>
+
+        <!-- ACA → Key Vault (read secrets) -->
+        <line x1="486" y1="270" x2="560" y2="248" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#arrow-purple)" stroke-dasharray="4,3"/>
+        <text x="510" y="258" fill="#bc8cff" font-size="8">Managed ID</text>
+
+        <!-- ACA → Event Hub PE -->
+        <line x1="486" y1="300" x2="560" y2="340" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#arrow-purple)" stroke-dasharray="4,3"/>
+
+        <!-- OAG → Event Hub (inbound) -->
+        <line x1="136" y1="355" x2="560" y2="355" stroke="#e3b341" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+        <text x="340" y="348" fill="#e3b341" font-size="8" text-anchor="middle">AMQP (public disabled / PE)</text>
+
+        <!-- Container App → NAT Gateway (egress) -->
+        <line x1="352" y1="480" x2="352" y2="513" stroke="#f85149" stroke-width="1.5" marker-end="url(#arrow-red)" stroke-dasharray="4,3"/>
+
+        <!-- NAT Gateway → Modulr (external) -->
+        <line x1="192" y1="544" x2="136" y2="466" stroke="#f85149" stroke-width="1.5" marker-end="url(#arrow-red)" stroke-dasharray="4,3"/>
+        <text x="140" y="512" fill="#f85149" font-size="8">20.50.124.92</text>
+
+        <!-- ACA → ACS (email) -->
+        <line x1="486" y1="320" x2="560" y2="500" stroke="#39d353" stroke-width="1" marker-end="url(#arrow-green)" stroke-dasharray="3,3"/>
+
+        <!-- GitHub → ACR (CI/CD) -->
+        <line x1="136" y1="580" x2="560" y2="430" stroke="#e3b341" stroke-width="1.5" marker-end="url(#arrow-orange)" stroke-dasharray="5,3"/>
+        <text x="360" y="540" fill="#e3b341" font-size="8" text-anchor="middle">docker push (OIDC)</text>
+
+        <!-- Legend -->
+        <rect x="192" y="645" width="700" height="40" rx="5" fill="#21262d" stroke="#30363d"/>
+        <line x1="208" y1="665" x2="238" y2="665" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+        <text x="244" y="668" fill="#8b949e" font-size="9">Inbound request</text>
+        <line x1="320" y1="665" x2="350" y2="665" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-blue)"/>
+        <text x="356" y="668" fill="#8b949e" font-size="9">Private Link</text>
+        <line x1="430" y1="665" x2="460" y2="665" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+        <text x="466" y="668" fill="#8b949e" font-size="9">DB / internal</text>
+        <line x1="548" y1="665" x2="578" y2="665" stroke="#f85149" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-red)"/>
+        <text x="584" y="668" fill="#8b949e" font-size="9">Egress (NAT)</text>
+        <line x1="660" y1="665" x2="690" y2="665" stroke="#e3b341" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-orange)"/>
+        <text x="696" y="668" fill="#8b949e" font-size="9">CI/CD</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ NEW: LAYER 4 TRANSPORT ═══════════════════ -->
+  <section id="layer4">
+    <h2>4. Layer 4 — Transport &amp; Ports</h2>
+    <p>All network connections entering, traversing, and leaving the platform, with protocol and port detail for firewall rule authoring and network troubleshooting.</p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 1060 780" width="100%" xmlns="http://www.w3.org/2000/svg" style="max-width:1060px;display:block;margin:auto">
+        <rect width="1060" height="780" fill="#161b22"/>
+
+        <!-- Column headers -->
+        <rect x="10" y="10" width="195" height="36" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="107" y="33" fill="#8b949e" font-size="11" text-anchor="middle" font-weight="700" letter-spacing="0.5">SOURCE</text>
+
+        <rect x="215" y="10" width="175" height="36" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="302" y="33" fill="#8b949e" font-size="11" text-anchor="middle" font-weight="700" letter-spacing="0.5">PROTOCOL + PORT</text>
+
+        <rect x="400" y="10" width="220" height="36" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="510" y="33" fill="#8b949e" font-size="11" text-anchor="middle" font-weight="700" letter-spacing="0.5">DESTINATION</text>
+
+        <rect x="630" y="10" width="90" height="36" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="675" y="33" fill="#8b949e" font-size="11" text-anchor="middle" font-weight="700" letter-spacing="0.5">DIR</text>
+
+        <rect x="730" y="10" width="320" height="36" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="890" y="33" fill="#8b949e" font-size="11" text-anchor="middle" font-weight="700" letter-spacing="0.5">NOTES</text>
+
+        <!-- Section divider: Inbound -->
+        <rect x="10" y="56" width="1040" height="22" rx="4" fill="#1c2540" stroke="#1f6feb" stroke-width="1"/>
+        <text x="520" y="71" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="700" letter-spacing="1">INBOUND TO PLATFORM</text>
+
+        <!-- Row 1 -->
+        <rect x="10" y="84" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="106" fill="#e6edf3" font-size="10" text-anchor="middle">Internet (any)</text>
+        <text x="302" y="101" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="113" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS / TLS 1.2+</text>
+        <text x="510" y="106" fill="#e6edf3" font-size="10" text-anchor="middle">Azure Front Door (global PoPs)</text>
+        <text x="675" y="106" fill="#3fb950" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="106" fill="#8b949e" font-size="9" text-anchor="middle">TLS terminated at nearest Front Door PoP; WAF inspection</text>
+
+        <!-- Row 2 -->
+        <rect x="10" y="118" width="1040" height="34" rx="3" fill="#161b22" stroke="#21262d"/>
+        <text x="107" y="140" fill="#e6edf3" font-size="10" text-anchor="middle">Internet (any)</text>
+        <text x="302" y="135" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="600">TCP 80</text>
+        <text x="302" y="147" fill="#8b949e" font-size="9" text-anchor="middle">HTTP (redirect only)</text>
+        <text x="510" y="140" fill="#e6edf3" font-size="10" text-anchor="middle">Azure Front Door</text>
+        <text x="675" y="140" fill="#3fb950" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="140" fill="#8b949e" font-size="9" text-anchor="middle">Front Door redirects HTTP → HTTPS; no traffic reaches origin</text>
+
+        <!-- Row 3 -->
+        <rect x="10" y="152" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="174" fill="#e6edf3" font-size="10" text-anchor="middle">Azure Front Door</text>
+        <text x="302" y="169" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="181" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS via Private Link</text>
+        <text x="510" y="174" fill="#e6edf3" font-size="10" text-anchor="middle">Container Apps (fdv2-app)</text>
+        <text x="675" y="174" fill="#3fb950" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="174" fill="#8b949e" font-size="9" text-anchor="middle">Private Link — ACA has no public IP; origin only reachable from AFD</text>
+
+        <!-- Section divider: Internal VNet -->
+        <rect x="10" y="196" width="1040" height="22" rx="4" fill="#13231a" stroke="#3fb950" stroke-width="1"/>
+        <text x="520" y="211" fill="#3fb950" font-size="10" text-anchor="middle" font-weight="700" letter-spacing="1">INTERNAL VNET (10.100.0.0/16)</text>
+
+        <!-- Row 4 -->
+        <rect x="10" y="224" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="246" fill="#e6edf3" font-size="10" text-anchor="middle">Container Apps (10.100.0.0/21)</text>
+        <text x="302" y="241" fill="#3fb950" font-size="10" text-anchor="middle" font-weight="600">TCP 5432</text>
+        <text x="302" y="253" fill="#8b949e" font-size="9" text-anchor="middle">PostgreSQL wire protocol</text>
+        <text x="510" y="246" fill="#e6edf3" font-size="10" text-anchor="middle">PostgreSQL 10.100.8.5</text>
+        <text x="675" y="246" fill="#3fb950" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="246" fill="#8b949e" font-size="9" text-anchor="middle">VNet-internal; no TLS (private subnet); pg Pool connection</text>
+
+        <!-- Row 5 -->
+        <rect x="10" y="258" width="1040" height="34" rx="3" fill="#161b22" stroke="#21262d"/>
+        <text x="107" y="280" fill="#e6edf3" font-size="10" text-anchor="middle">Container Apps</text>
+        <text x="302" y="275" fill="#bc8cff" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="287" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS — Key Vault REST API</text>
+        <text x="510" y="280" fill="#e6edf3" font-size="10" text-anchor="middle">Key Vault PE (10.100.9.x)</text>
+        <text x="675" y="280" fill="#3fb950" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="280" fill="#8b949e" font-size="9" text-anchor="middle">Managed Identity auth; private endpoint; no public Key Vault access</text>
+
+        <!-- Row 6 -->
+        <rect x="10" y="292" width="1040" height="46" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="322" fill="#e6edf3" font-size="10" text-anchor="middle">Container Apps</text>
+        <text x="302" y="307" fill="#bc8cff" font-size="10" text-anchor="middle" font-weight="600">TCP 5671 / 5672</text>
+        <text x="302" y="319" fill="#8b949e" font-size="9" text-anchor="middle">AMQP+TLS / AMQP</text>
+        <text x="302" y="330" fill="#8b949e" font-size="9" text-anchor="middle">TCP 443 (HTTPS fallback)</text>
+        <text x="510" y="322" fill="#e6edf3" font-size="10" text-anchor="middle">Event Hub PE (10.100.9.5)</text>
+        <text x="675" y="322" fill="#3fb950" font-size="11" text-anchor="middle">↔</text>
+        <text x="890" y="315" fill="#8b949e" font-size="9" text-anchor="middle">eventHubConsumer.js reads from oag-flight-alerts;</text>
+        <text x="890" y="327" fill="#8b949e" font-size="9" text-anchor="middle">private endpoint; public access disabled on namespace;</text>
+        <text x="890" y="339" fill="#8b949e" font-size="9" text-anchor="middle">AMQP+TLS preferred, HTTPS websocket fallback</text>
+
+        <!-- Section divider: Outbound NAT -->
+        <rect x="10" y="348" width="1040" height="22" rx="4" fill="#1d1318" stroke="#f85149" stroke-width="1"/>
+        <text x="520" y="363" fill="#f85149" font-size="10" text-anchor="middle" font-weight="700" letter-spacing="1">OUTBOUND VIA NAT GATEWAY (egress IP 20.50.124.92)</text>
+
+        <!-- Row 7 -->
+        <rect x="10" y="376" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="398" fill="#e6edf3" font-size="10" text-anchor="middle">Container Apps → NAT GW</text>
+        <text x="302" y="393" fill="#f85149" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="405" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS</text>
+        <text x="510" y="398" fill="#e6edf3" font-size="10" text-anchor="middle">OAG Flight Info API</text>
+        <text x="675" y="398" fill="#f85149" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="398" fill="#8b949e" font-size="9" text-anchor="middle">flightLookup.js + oagAlerts.js; API key from Key Vault; whitelist 20.50.124.92 at OAG</text>
+
+        <!-- Row 8 -->
+        <rect x="10" y="410" width="1040" height="34" rx="3" fill="#161b22" stroke="#21262d"/>
+        <text x="107" y="432" fill="#e6edf3" font-size="10" text-anchor="middle">Container Apps → NAT GW</text>
+        <text x="302" y="427" fill="#f85149" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="439" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS</text>
+        <text x="510" y="432" fill="#e6edf3" font-size="10" text-anchor="middle">Policy / Claims API (per-tenant URL)</text>
+        <text x="675" y="432" fill="#f85149" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="432" fill="#8b949e" font-size="9" text-anchor="middle">policyValidator.js; bearer auth; tenant policy_api_url in DB; whitelist 20.50.124.92</text>
+
+        <!-- Row 9 -->
+        <rect x="10" y="444" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="466" fill="#e6edf3" font-size="10" text-anchor="middle">Container Apps → NAT GW</text>
+        <text x="302" y="461" fill="#f85149" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="473" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS</text>
+        <text x="510" y="466" fill="#e6edf3" font-size="10" text-anchor="middle">Modulr Faster Payments API</text>
+        <text x="675" y="466" fill="#f85149" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="466" fill="#8b949e" font-size="9" text-anchor="middle">modulr.js; per-tenant encrypted API key; whitelist 20.50.124.92 at Modulr</text>
+
+        <!-- Row 10 -->
+        <rect x="10" y="478" width="1040" height="34" rx="3" fill="#161b22" stroke="#21262d"/>
+        <text x="107" y="500" fill="#e6edf3" font-size="10" text-anchor="middle">Container Apps → NAT GW</text>
+        <text x="302" y="495" fill="#f85149" font-size="10" text-anchor="middle" font-weight="600">TCP 587</text>
+        <text x="302" y="507" fill="#8b949e" font-size="9" text-anchor="middle">SMTP STARTTLS</text>
+        <text x="510" y="500" fill="#e6edf3" font-size="10" text-anchor="middle">ACS SMTP (smtp.azurecomm.net)</text>
+        <text x="675" y="500" fill="#f85149" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="500" fill="#8b949e" font-size="9" text-anchor="middle">notificationService.js via Nodemailer; ACS SMTP credentials in Key Vault</text>
+
+        <!-- Row 11 -->
+        <rect x="10" y="512" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="534" fill="#8b949e" font-size="10" text-anchor="middle">Container Apps → NAT GW</text>
+        <text x="302" y="529" fill="#8b949e" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="541" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS (planned)</text>
+        <text x="510" y="534" fill="#8b949e" font-size="10" text-anchor="middle">Twilio (SMS/WhatsApp)</text>
+        <text x="675" y="534" fill="#8b949e" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="534" fill="#8b949e" font-size="9" text-anchor="middle">twilioService.js — deferred; whitelist 20.50.124.92 at Twilio when implemented</text>
+
+        <!-- Section divider: OAG inbound to Event Hub -->
+        <rect x="10" y="556" width="1040" height="22" rx="4" fill="#1e1a10" stroke="#e3b341" stroke-width="1"/>
+        <text x="520" y="571" fill="#e3b341" font-size="10" text-anchor="middle" font-weight="700" letter-spacing="1">OAG → EVENT HUB (inbound event stream)</text>
+
+        <!-- Row 12 -->
+        <rect x="10" y="584" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="606" fill="#e6edf3" font-size="10" text-anchor="middle">OAG (external)</text>
+        <text x="302" y="601" fill="#e3b341" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="613" fill="#8b949e" font-size="9" text-anchor="middle">AMQP over TLS (HTTPS PL)</text>
+        <text x="510" y="606" fill="#e6edf3" font-size="10" text-anchor="middle">Event Hub PE 10.100.9.5</text>
+        <text x="675" y="606" fill="#e3b341" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="606" fill="#8b949e" font-size="9" text-anchor="middle">OAG pushes flight delay events to oag-flight-alerts hub; private endpoint</text>
+
+        <!-- Section divider: CI/CD -->
+        <rect x="10" y="628" width="1040" height="22" rx="4" fill="#1e1a2e" stroke="#bc8cff" stroke-width="1"/>
+        <text x="520" y="643" fill="#bc8cff" font-size="10" text-anchor="middle" font-weight="700" letter-spacing="1">CI/CD — GITHUB ACTIONS</text>
+
+        <!-- Row 13 -->
+        <rect x="10" y="656" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="678" fill="#e6edf3" font-size="10" text-anchor="middle">GitHub Actions runner</text>
+        <text x="302" y="673" fill="#bc8cff" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="685" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS</text>
+        <text x="510" y="678" fill="#e6edf3" font-size="10" text-anchor="middle">fdv2acr.azurecr.io (ACR)</text>
+        <text x="675" y="678" fill="#bc8cff" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="678" fill="#8b949e" font-size="9" text-anchor="middle">docker push :sha + :latest; ACR Basic (public runner access)</text>
+
+        <!-- Row 14 -->
+        <rect x="10" y="690" width="1040" height="34" rx="3" fill="#161b22" stroke="#21262d"/>
+        <text x="107" y="712" fill="#e6edf3" font-size="10" text-anchor="middle">GitHub Actions runner</text>
+        <text x="302" y="707" fill="#bc8cff" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="719" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS</text>
+        <text x="510" y="712" fill="#e6edf3" font-size="10" text-anchor="middle">Azure Container Apps mgmt API</text>
+        <text x="675" y="712" fill="#bc8cff" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="712" fill="#8b949e" font-size="9" text-anchor="middle">az containerapp update; OIDC federated credential auth via Azure AD</text>
+
+        <!-- Row 15 -->
+        <rect x="10" y="724" width="1040" height="34" rx="3" fill="#0d1117" stroke="#21262d"/>
+        <text x="107" y="746" fill="#e6edf3" font-size="10" text-anchor="middle">GitHub Actions runner</text>
+        <text x="302" y="741" fill="#bc8cff" font-size="10" text-anchor="middle" font-weight="600">TCP 443</text>
+        <text x="302" y="753" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS — OIDC token</text>
+        <text x="510" y="746" fill="#e6edf3" font-size="10" text-anchor="middle">Azure AD (login.microsoftonline.com)</text>
+        <text x="675" y="746" fill="#bc8cff" font-size="11" text-anchor="middle">→</text>
+        <text x="890" y="746" fill="#8b949e" font-size="9" text-anchor="middle">OIDC Workload Identity Federation; no stored client secret</text>
+
+        <!-- Legend -->
+        <rect x="10" y="762" width="1040" height="14" rx="3" fill="#21262d" stroke="#30363d"/>
+        <text x="80"  y="773" fill="#3fb950" font-size="9" text-anchor="middle">→ Inbound / internal</text>
+        <text x="260" y="773" fill="#f85149" font-size="9" text-anchor="middle">→ Outbound via NAT Gateway (20.50.124.92)</text>
+        <text x="480" y="773" fill="#e3b341" font-size="9" text-anchor="middle">→ OAG event ingestion</text>
+        <text x="640" y="773" fill="#bc8cff" font-size="9" text-anchor="middle">→ CI/CD</text>
+        <text x="830" y="773" fill="#8b949e" font-size="9" text-anchor="middle">Muted rows = planned / not yet implemented</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 5. TRAFFIC FLOW ═══════════════════ -->
+  <section id="traffic-flow">
+    <h2>5. Traffic Flow Diagram</h2>
+    <p>End-to-end request path from browser through to the database, and the parallel Event Hub payout flow.</p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 960 580" width="100%" xmlns="http://www.w3.org/2000/svg" style="max-width:960px;display:block;margin:auto">
+        <defs>
+          <marker id="tf-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+          </marker>
+          <marker id="tf-arrow-g" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#3fb950"/>
+          </marker>
+          <marker id="tf-arrow-o" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#e3b341"/>
+          </marker>
+        </defs>
+        <rect width="960" height="580" fill="#161b22"/>
+
+        <!-- Column headers -->
+        <!-- Browser -->
+        <rect x="20" y="20" width="100" height="40" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="70" y="45" fill="#e6edf3" font-size="11" text-anchor="middle" font-weight="600">Browser</text>
+
+        <!-- Front Door -->
+        <rect x="155" y="20" width="120" height="40" rx="5" fill="#1c2540" stroke="#1f6feb"/>
+        <text x="215" y="38" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="600">Front Door</text>
+        <text x="215" y="52" fill="#8b949e" font-size="8" text-anchor="middle">WAF + TLS term.</text>
+
+        <!-- Container App -->
+        <rect x="312" y="20" width="130" height="40" rx="5" fill="#1a2332" stroke="#58a6ff"/>
+        <text x="377" y="38" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="600">Container App</text>
+        <text x="377" y="52" fill="#8b949e" font-size="8" text-anchor="middle">Express 5 · Port 3000</text>
+
+        <!-- Middleware stack -->
+        <rect x="477" y="20" width="130" height="40" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="542" y="38" fill="#e6edf3" font-size="10" text-anchor="middle" font-weight="600">Middleware</text>
+        <text x="542" y="52" fill="#8b949e" font-size="8" text-anchor="middle">Helmet/CORS/Rate limit</text>
+
+        <!-- Routes -->
+        <rect x="642" y="20" width="100" height="40" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="692" y="38" fill="#e6edf3" font-size="10" text-anchor="middle" font-weight="600">Route handler</text>
+        <text x="692" y="52" fill="#8b949e" font-size="8" text-anchor="middle">+ Service layer</text>
+
+        <!-- PostgreSQL -->
+        <rect x="778" y="20" width="100" height="40" rx="5" fill="#13231a" stroke="#3fb950"/>
+        <text x="828" y="38" fill="#3fb950" font-size="10" text-anchor="middle" font-weight="600">PostgreSQL</text>
+        <text x="828" y="52" fill="#8b949e" font-size="8" text-anchor="middle">10.100.8.5</text>
+
+        <!-- Vertical lane lines -->
+        <line x1="70"  y1="60" x2="70"  y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="215" y1="60" x2="215" y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="377" y1="60" x2="377" y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="542" y1="60" x2="542" y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="692" y1="60" x2="692" y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="828" y1="60" x2="828" y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+
+        <!-- ── Step 1: Browser → Front Door (HTTPS 443) ── -->
+        <text x="20" y="90" fill="#8b949e" font-size="9" font-style="italic">1</text>
+        <line x1="80" y1="90" x2="207" y2="90" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#tf-arrow)"/>
+        <text x="143" y="84" fill="#58a6ff" font-size="9" text-anchor="middle">HTTPS :443</text>
+        <text x="143" y="101" fill="#8b949e" font-size="8" text-anchor="middle">TLS terminated at AFD PoP</text>
+
+        <!-- ── Step 2: WAF inspection ── -->
+        <text x="160" y="125" fill="#8b949e" font-size="9" font-style="italic">2</text>
+        <rect x="163" y="118" width="104" height="26" rx="4" fill="#1c2540" stroke="#1f6feb" stroke-width="1"/>
+        <text x="215" y="135" fill="#58a6ff" font-size="9" text-anchor="middle">WAF inspection (OWASP 2.1)</text>
+
+        <!-- ── Step 3: Front Door → Container App (Private Link HTTP) ── -->
+        <text x="160" y="165" fill="#8b949e" font-size="9" font-style="italic">3</text>
+        <line x1="223" y1="160" x2="369" y2="160" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#tf-arrow)" stroke-dasharray="5,3"/>
+        <text x="296" y="154" fill="#58a6ff" font-size="9" text-anchor="middle">HTTP via Private Link</text>
+        <text x="296" y="172" fill="#8b949e" font-size="8" text-anchor="middle">X-Forwarded-For preserved</text>
+
+        <!-- ── Step 4: resolveTenant ── -->
+        <text x="322" y="205" fill="#8b949e" font-size="9" font-style="italic">4</text>
+        <line x1="385" y1="200" x2="534" y2="200" stroke="#e6edf3" stroke-width="1.5" marker-end="url(#tf-arrow)"/>
+        <text x="459" y="194" fill="#e6edf3" font-size="9" text-anchor="middle">resolveTenant middleware</text>
+        <text x="459" y="212" fill="#8b949e" font-size="8" text-anchor="middle">Host → slug (30s cache)</text>
+
+        <!-- ── DB lookup for tenant ── -->
+        <line x1="550" y1="200" x2="820" y2="200" stroke="#3fb950" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#tf-arrow-g)"/>
+        <text x="690" y="193" fill="#3fb950" font-size="8" text-anchor="middle">SELECT * FROM tenants WHERE slug=? (cache miss only)</text>
+        <line x1="820" y1="212" x2="550" y2="212" stroke="#3fb950" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#tf-arrow-g)"/>
+
+        <!-- ── Step 5: Rate limiting + logging ── -->
+        <text x="322" y="248" fill="#8b949e" font-size="9" font-style="italic">5</text>
+        <rect x="480" y="237" width="124" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="542" y="253" fill="#e6edf3" font-size="9" text-anchor="middle">Rate limiter · requestLogger</text>
+
+        <!-- ── Step 6: Route dispatch ── -->
+        <text x="322" y="290" fill="#8b949e" font-size="9" font-style="italic">6</text>
+        <line x1="550" y1="285" x2="684" y2="285" stroke="#e6edf3" stroke-width="1.5" marker-end="url(#tf-arrow)"/>
+        <text x="617" y="278" fill="#e6edf3" font-size="9" text-anchor="middle">Route dispatch</text>
+        <text x="617" y="297" fill="#8b949e" font-size="8" text-anchor="middle">/api/registrations, /api/flight-lookup …</text>
+
+        <!-- ── Step 7: DB query ── -->
+        <text x="640" y="330" fill="#8b949e" font-size="9" font-style="italic">7</text>
+        <line x1="700" y1="325" x2="820" y2="325" stroke="#3fb950" stroke-width="1.5" marker-end="url(#tf-arrow-g)"/>
+        <text x="760" y="318" fill="#3fb950" font-size="9" text-anchor="middle">pg query (VNet)</text>
+        <line x1="820" y1="337" x2="700" y2="337" stroke="#3fb950" stroke-width="1.5" marker-end="url(#tf-arrow-g)"/>
+
+        <!-- ── Step 8: Response ── -->
+        <text x="322" y="375" fill="#8b949e" font-size="9" font-style="italic">8</text>
+        <line x1="376" y1="370" x2="86" y2="370" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#tf-arrow)"/>
+        <text x="230" y="363" fill="#58a6ff" font-size="9" text-anchor="middle">JSON response</text>
+        <text x="230" y="382" fill="#8b949e" font-size="8" text-anchor="middle">Via Private Link → Front Door → browser</text>
+
+        <!-- ── Separator ── -->
+        <line x1="20" y1="410" x2="940" y2="410" stroke="#30363d" stroke-width="1" stroke-dasharray="6,4"/>
+        <text x="480" y="425" fill="#e3b341" font-size="10" text-anchor="middle" font-weight="600">Parallel: OAG Event Hub → Payout flow</text>
+
+        <!-- OAG column header -->
+        <rect x="20" y="435" width="100" height="32" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="70" y="456" fill="#e6edf3" font-size="10" text-anchor="middle">OAG / Event Hub</text>
+
+        <!-- payout lane lines -->
+        <line x1="70"  y1="467" x2="70"  y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="692" y1="467" x2="692" y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="828" y1="467" x2="828" y2="560" stroke="#30363d" stroke-width="1" stroke-dasharray="3,4"/>
+
+        <!-- Event → Event Hub consumer -->
+        <text x="20" y="490" fill="#8b949e" font-size="9" font-style="italic">A</text>
+        <line x1="80" y1="485" x2="368" y2="485" stroke="#e3b341" stroke-width="1.5" marker-end="url(#tf-arrow-o)"/>
+        <text x="224" y="478" fill="#e3b341" font-size="9" text-anchor="middle">eventHubConsumer.js (AMQP, PE)</text>
+
+        <!-- delayProcessor -->
+        <text x="322" y="520" fill="#8b949e" font-size="9" font-style="italic">B</text>
+        <line x1="385" y1="515" x2="684" y2="515" stroke="#e3b341" stroke-width="1.5" marker-end="url(#tf-arrow-o)"/>
+        <text x="534" y="508" fill="#e3b341" font-size="9" text-anchor="middle">delayProcessor.processEvent()</text>
+        <text x="534" y="527" fill="#8b949e" font-size="8" text-anchor="middle">decrypt bank details → Modulr payout → email</text>
+
+        <!-- DB update -->
+        <text x="640" y="555" fill="#8b949e" font-size="9" font-style="italic">C</text>
+        <line x1="700" y1="550" x2="820" y2="550" stroke="#3fb950" stroke-width="1.5" marker-end="url(#tf-arrow-g)"/>
+        <text x="760" y="543" fill="#3fb950" font-size="9" text-anchor="middle">UPDATE payments/registrations</text>
+      </svg>
+    </div>
+
+    <h3>Request flow — step by step</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Step</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Browser → Front Door</td><td>HTTPS on port 443. TLS terminated at the Front Door PoP nearest the user.</td></tr>
+          <tr><td>2</td><td>WAF inspection</td><td>OWASP 2.1 ruleset in Prevention mode. Malicious requests blocked before reaching origin.</td></tr>
+          <tr><td>3</td><td>Front Door → Container App</td><td>HTTP over Private Link. Container App environment has no public IP.</td></tr>
+          <tr><td>4</td><td>resolveTenant</td><td><code>Host</code> header stripped to subdomain slug, looked up in DB (30s in-memory cache). <code>req.tenant</code> populated.</td></tr>
+          <tr><td>5</td><td>Rate limiting + logging</td><td>Per-IP rate limits (registration / validate / login). All <code>/api/*</code> calls written to <code>request_log</code>.</td></tr>
+          <tr><td>6</td><td>Route dispatch</td><td>Helmet CSP headers applied. Admin routes require JWT (<code>requireAdmin</code> / <code>requireSuperAdmin</code>).</td></tr>
+          <tr><td>7</td><td>DB query</td><td>pg Pool connection to PostgreSQL on 10.100.8.5:5432 inside VNet.</td></tr>
+          <tr><td>8</td><td>Response</td><td>JSON response back through Private Link to Front Door, then HTTPS to browser.</td></tr>
+          <tr><td>A–C</td><td>Event Hub payout flow</td><td>OAG pushes flight status to Event Hub. <code>eventHubConsumer.js</code> processes partitions, calls <code>delayProcessor.processEvent()</code>. Bank details decrypted, Modulr payout sent via NAT Gateway egress IP (20.50.124.92), DB updated, customer email queued.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ NEW: EXTERNAL INTEGRATIONS ═══════════════════ -->
+  <section id="external-integrations">
+    <h2>6. External Integrations</h2>
+    <p>All third-party APIs and external services the platform communicates with. All outbound calls egress via NAT Gateway static IP <strong>20.50.124.92</strong> — whitelist this IP at each provider.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Purpose</th>
+            <th>Code</th>
+            <th>Auth</th>
+            <th>Protocol / Port</th>
+            <th>Direction</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>OAG Flight Info API</strong></td>
+            <td>Flight status lookup; delay alert subscriptions</td>
+            <td><code>routes/flightLookup.js</code><br><code>services/oagAlerts.js</code></td>
+            <td>API key — stored in <code>shared_api_keys</code> table (superadmin managed), fetched from Key Vault</td>
+            <td>HTTPS — TCP 443</td>
+            <td>Outbound via NAT GW</td>
+            <td>Whitelist <code>20.50.124.92</code> at OAG</td>
+          </tr>
+          <tr>
+            <td><strong>OAG Event Hub</strong></td>
+            <td>Inbound stream of flight delay / cancellation events</td>
+            <td><code>services/eventHubConsumer.js</code></td>
+            <td>Event Hub connection string (Key Vault secret)</td>
+            <td>AMQP over TLS — TCP 443 via private endpoint (10.100.9.5)</td>
+            <td>Inbound (OAG → Event Hub → app)</td>
+            <td>Internal to Azure; private endpoint; public access disabled on namespace</td>
+          </tr>
+          <tr>
+            <td><strong>Claims / Policy Validation API</strong></td>
+            <td>Validate policy is active; get payout amount and customer email</td>
+            <td><code>services/policyValidator.js</code></td>
+            <td>Bearer token — encrypted API key per tenant (<code>tenants.policy_api_key_enc</code>)</td>
+            <td>HTTPS — TCP 443</td>
+            <td>Outbound via NAT GW</td>
+            <td>Endpoints: <code>POST {policy_api_url}/api/PolicySearch/getpolicy</code> and <code>GET {policy_api_url}/api/coverholders</code>. Each tenant configures their own URL in the admin panel.</td>
+          </tr>
+          <tr>
+            <td><strong>Modulr Faster Payments</strong></td>
+            <td>Initiate Faster Payments bank transfers to customers</td>
+            <td><code>services/modulr.js</code></td>
+            <td>API key per tenant (encrypted in <code>tenants</code> table)</td>
+            <td>HTTPS — TCP 443</td>
+            <td>Outbound via NAT GW</td>
+            <td>Whitelist <code>20.50.124.92</code> at Modulr. Bank details decrypted inside <code>delayProcessor.js</code> immediately before call.</td>
+          </tr>
+          <tr>
+            <td><strong>Azure Communication Services SMTP</strong></td>
+            <td>Transactional email: registration confirmation, payout notification</td>
+            <td><code>services/notificationService.js</code> via Nodemailer</td>
+            <td>ACS SMTP credentials (Key Vault secrets <code>SMTP_USER</code> / <code>SMTP_PASS</code>)</td>
+            <td>SMTP STARTTLS — TCP 587</td>
+            <td>Outbound via NAT GW</td>
+            <td>Relay host: <code>smtp.azurecomm.net</code>. From domain: Azure managed domain until custom domain added.</td>
+          </tr>
+          <tr>
+            <td><strong>Twilio</strong> <span class="badge badge-yellow">Planned</span></td>
+            <td>SMS and WhatsApp payment / delay notifications</td>
+            <td><code>services/twilioService.js</code> (to be built)</td>
+            <td>Twilio API key (to be added to Key Vault)</td>
+            <td>HTTPS — TCP 443</td>
+            <td>Outbound via NAT GW</td>
+            <td>Deferred — not yet implemented. Whitelist <code>20.50.124.92</code> at Twilio when built.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>External integrations diagram</h3>
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 1000 560" width="100%" xmlns="http://www.w3.org/2000/svg" style="max-width:1000px;display:block;margin:auto">
+        <defs>
+          <marker id="ei-arrow-out" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#f85149"/>
+          </marker>
+          <marker id="ei-arrow-in" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#e3b341"/>
+          </marker>
+          <marker id="ei-arrow-muted" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#484f58"/>
+          </marker>
+        </defs>
+        <rect width="1000" height="560" fill="#161b22"/>
+
+        <!-- Central: Container Apps -->
+        <rect x="360" y="210" width="280" height="130" rx="10" fill="#1a2332" stroke="#58a6ff" stroke-width="2"/>
+        <text x="500" y="235" fill="#58a6ff" font-size="12" text-anchor="middle" font-weight="700">Container Apps</text>
+        <text x="500" y="253" fill="#8b949e" font-size="9" text-anchor="middle">fdv2-app · Node.js 20 / Express 5</text>
+        <text x="500" y="268" fill="#8b949e" font-size="9" text-anchor="middle">fdv2-aca-subnet · 10.100.0.0/21</text>
+        <text x="500" y="290" fill="#f85149" font-size="9" text-anchor="middle" font-weight="600">All outbound egress → NAT Gateway</text>
+        <text x="500" y="304" fill="#f85149" font-size="10" text-anchor="middle" font-weight="700">Static IP: 20.50.124.92</text>
+        <text x="500" y="320" fill="#8b949e" font-size="9" text-anchor="middle">(whitelist this IP at each provider)</text>
+
+        <!-- OAG Flight Info API (top-left) -->
+        <rect x="20" y="30" width="200" height="68" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="120" y="55" fill="#58a6ff" font-size="11" text-anchor="middle" font-weight="700">OAG Flight Info API</text>
+        <text x="120" y="71" fill="#8b949e" font-size="9" text-anchor="middle">Flight status + alert subscriptions</text>
+        <text x="120" y="87" fill="#e3b341" font-size="9" text-anchor="middle">HTTPS · TCP 443</text>
+
+        <!-- OAG Event Hub (top-right) -->
+        <rect x="780" y="30" width="200" height="68" rx="8" fill="#21262d" stroke="#e3b341" stroke-width="1.5"/>
+        <text x="880" y="55" fill="#e3b341" font-size="11" text-anchor="middle" font-weight="700">OAG Event Hub</text>
+        <text x="880" y="71" fill="#8b949e" font-size="9" text-anchor="middle">oag-flight-alerts (4 partitions)</text>
+        <text x="880" y="87" fill="#e3b341" font-size="9" text-anchor="middle">AMQP/TLS · PE 10.100.9.5:443</text>
+
+        <!-- Policy/Claims API (left-mid) -->
+        <rect x="20" y="245" width="200" height="68" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="120" y="268" fill="#58a6ff" font-size="11" text-anchor="middle" font-weight="700">Policy / Claims API</text>
+        <text x="120" y="284" fill="#8b949e" font-size="9" text-anchor="middle">Per-tenant URL · policy validation</text>
+        <text x="120" y="300" fill="#e3b341" font-size="9" text-anchor="middle">HTTPS · TCP 443</text>
+
+        <!-- Modulr (bottom-left) -->
+        <rect x="20" y="440" width="200" height="68" rx="8" fill="#21262d" stroke="#f85149" stroke-width="1.5"/>
+        <text x="120" y="463" fill="#f85149" font-size="11" text-anchor="middle" font-weight="700">Modulr Faster Payments</text>
+        <text x="120" y="479" fill="#8b949e" font-size="9" text-anchor="middle">Per-tenant encrypted API key</text>
+        <text x="120" y="495" fill="#e3b341" font-size="9" text-anchor="middle">HTTPS · TCP 443</text>
+
+        <!-- ACS SMTP (bottom-centre) -->
+        <rect x="360" y="440" width="200" height="68" rx="8" fill="#21262d" stroke="#39d353" stroke-width="1.5"/>
+        <text x="460" y="463" fill="#39d353" font-size="11" text-anchor="middle" font-weight="700">ACS SMTP</text>
+        <text x="460" y="479" fill="#8b949e" font-size="9" text-anchor="middle">smtp.azurecomm.net · email</text>
+        <text x="460" y="495" fill="#e3b341" font-size="9" text-anchor="middle">SMTP STARTTLS · TCP 587</text>
+
+        <!-- Twilio (bottom-right, muted) -->
+        <rect x="700" y="440" width="200" height="68" rx="8" fill="#1a1a1a" stroke="#484f58" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="800" y="463" fill="#8b949e" font-size="11" text-anchor="middle" font-weight="700">Twilio</text>
+        <text x="800" y="479" fill="#8b949e" font-size="9" text-anchor="middle">SMS / WhatsApp · planned</text>
+        <text x="800" y="495" fill="#8b949e" font-size="9" text-anchor="middle">HTTPS · TCP 443</text>
+
+        <!-- Arrows: Container Apps → OAG Flight Info (outbound) -->
+        <line x1="360" y1="240" x2="222" y2="80" stroke="#f85149" stroke-width="1.5" marker-end="url(#ei-arrow-out)"/>
+        <text x="278" y="152" fill="#f85149" font-size="8" text-anchor="middle" transform="rotate(-35,278,152)">HTTPS :443 (outbound)</text>
+
+        <!-- OAG → Event Hub → Container Apps (inbound) -->
+        <line x1="780" y1="64" x2="642" y2="240" stroke="#e3b341" stroke-width="1.5" marker-end="url(#ei-arrow-in)"/>
+        <text x="724" y="152" fill="#e3b341" font-size="8" text-anchor="middle" transform="rotate(35,724,152)">AMQP/TLS :443 (inbound PE)</text>
+
+        <!-- Container Apps → Policy API (outbound) -->
+        <line x1="360" y1="275" x2="222" y2="279" stroke="#f85149" stroke-width="1.5" marker-end="url(#ei-arrow-out)"/>
+        <text x="290" y="268" fill="#f85149" font-size="8" text-anchor="middle">HTTPS :443</text>
+        <text x="290" y="279" fill="#8b949e" font-size="8" text-anchor="middle">(outbound via NAT GW)</text>
+
+        <!-- Container Apps → Modulr (outbound) -->
+        <line x1="400" y1="340" x2="200" y2="440" stroke="#f85149" stroke-width="1.5" marker-end="url(#ei-arrow-out)"/>
+        <text x="284" y="390" fill="#f85149" font-size="8" text-anchor="middle" transform="rotate(-28,284,390)">HTTPS :443 (outbound)</text>
+
+        <!-- Container Apps → ACS SMTP (outbound) -->
+        <line x1="460" y1="340" x2="460" y2="438" stroke="#39d353" stroke-width="1.5" marker-end="url(#ei-arrow-out)"/>
+        <text x="476" y="392" fill="#39d353" font-size="8">SMTP</text>
+        <text x="476" y="404" fill="#39d353" font-size="8">:587</text>
+
+        <!-- Container Apps → Twilio (outbound, muted) -->
+        <line x1="600" y1="340" x2="760" y2="438" stroke="#484f58" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ei-arrow-muted)"/>
+        <text x="690" y="388" fill="#8b949e" font-size="8" text-anchor="middle" transform="rotate(28,690,388)">HTTPS :443 (planned)</text>
+
+        <!-- NAT Gateway label on outbound arrow to Modulr -->
+        <rect x="22" y="370" width="138" height="28" rx="4" fill="#1d1318" stroke="#f85149" stroke-width="1"/>
+        <text x="91" y="383" fill="#f85149" font-size="9" text-anchor="middle" font-weight="600">NAT Gateway</text>
+        <text x="91" y="394" fill="#f85149" font-size="9" text-anchor="middle">20.50.124.92</text>
+
+        <!-- Legend -->
+        <rect x="20" y="525" width="960" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <line x1="40" y1="537" x2="70" y2="537" stroke="#f85149" stroke-width="1.5" marker-end="url(#ei-arrow-out)"/>
+        <text x="130" y="540" fill="#8b949e" font-size="9">Outbound via NAT Gateway (20.50.124.92)</text>
+        <line x1="310" y1="537" x2="340" y2="537" stroke="#e3b341" stroke-width="1.5" marker-end="url(#ei-arrow-in)"/>
+        <text x="400" y="540" fill="#8b949e" font-size="9">Inbound (OAG → Event Hub private endpoint)</text>
+        <line x1="600" y1="537" x2="630" y2="537" stroke="#484f58" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ei-arrow-muted)"/>
+        <text x="690" y="540" fill="#8b949e" font-size="9">Planned — not yet implemented</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 7. APPLICATION ARCHITECTURE ═══════════════════ -->
+  <section id="app-arch">
+    <h2>7. Application Architecture</h2>
+    <p>
+      The application is a single Node.js 20 / Express 5 process. All three frontends
+      (customer SPA, admin SPA, landing page) are served as static files from the same container.
+      Background event processing runs as a startup service in the same process.
+    </p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 960 680" width="100%" xmlns="http://www.w3.org/2000/svg" style="max-width:960px;display:block;margin:auto">
+        <defs>
+          <marker id="app-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+          </marker>
+          <marker id="app-arrow-g" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#3fb950"/>
+          </marker>
+        </defs>
+        <rect width="960" height="680" fill="#161b22"/>
+
+        <!-- Title -->
+        <text x="480" y="28" fill="#8b949e" font-size="11" text-anchor="middle" font-weight="600">Express 5 Application — server/src/index.js</text>
+
+        <!-- ── Middleware stack (vertical) ── -->
+        <rect x="20" y="40" width="160" height="570" rx="8" fill="#1a2332" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="100" y="60" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="700">MIDDLEWARE STACK</text>
+        <text x="100" y="74" fill="#8b949e" font-size="8" text-anchor="middle">(runs on every request)</text>
+
+        <!-- MW items -->
+        <rect x="30" y="82" width="140" height="26" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="100" y="99" fill="#e6edf3" font-size="10" text-anchor="middle">Helmet (CSP headers)</text>
+
+        <rect x="30" y="116" width="140" height="26" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="100" y="133" fill="#e6edf3" font-size="10" text-anchor="middle">CORS (per-path config)</text>
+
+        <rect x="30" y="150" width="140" height="26" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="100" y="167" fill="#e6edf3" font-size="10" text-anchor="middle">compression()</text>
+
+        <rect x="30" y="184" width="140" height="26" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="100" y="201" fill="#e6edf3" font-size="10" text-anchor="middle">express.json (100kb)</text>
+
+        <rect x="30" y="218" width="140" height="26" rx="4" fill="#21262d" stroke="#1f6feb" stroke-width="1.5"/>
+        <text x="100" y="235" fill="#58a6ff" font-size="10" text-anchor="middle" font-weight="600">resolveTenant</text>
+
+        <rect x="30" y="252" width="140" height="26" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="100" y="269" fill="#e6edf3" font-size="10" text-anchor="middle">requestLogger (/api/*)</text>
+
+        <rect x="30" y="286" width="140" height="26" rx="4" fill="#21262d" stroke="#f85149" stroke-width="1.5"/>
+        <text x="100" y="303" fill="#f85149" font-size="10" text-anchor="middle">rateLimiter (3 pools)</text>
+
+        <rect x="30" y="320" width="140" height="26" rx="4" fill="#21262d" stroke="#bc8cff" stroke-width="1.5"/>
+        <text x="100" y="337" fill="#bc8cff" font-size="10" text-anchor="middle">requireAdmin (JWT)</text>
+
+        <!-- ── Public routes ── -->
+        <rect x="210" y="40" width="220" height="390" rx="8" fill="#131c2e" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="320" y="60" fill="#3fb950" font-size="10" text-anchor="middle" font-weight="700">PUBLIC ROUTES</text>
+
+        <rect x="220" y="72" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="320" y="88" fill="#8b949e" font-size="9" text-anchor="middle">GET /api/health</text>
+
+        <rect x="220" y="104" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="320" y="120" fill="#e6edf3" font-size="9" text-anchor="middle">GET /api/tenant-config</text>
+
+        <rect x="220" y="136" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="320" y="152" fill="#e6edf3" font-size="9" text-anchor="middle">GET /api/airports</text>
+
+        <rect x="220" y="168" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="320" y="184" fill="#e6edf3" font-size="9" text-anchor="middle">GET /api/carriers</text>
+
+        <rect x="220" y="200" width="200" height="24" rx="4" fill="#21262d" stroke="#f85149" stroke-width="1"/>
+        <text x="320" y="216" fill="#e6edf3" font-size="9" text-anchor="middle">GET /api/flight-lookup   <tspan fill="#f85149">[rate]</tspan></text>
+
+        <rect x="220" y="232" width="200" height="24" rx="4" fill="#21262d" stroke="#f85149" stroke-width="1"/>
+        <text x="320" y="248" fill="#e6edf3" font-size="9" text-anchor="middle">POST /api/validate-policy   <tspan fill="#f85149">[rate]</tspan></text>
+
+        <rect x="220" y="264" width="200" height="24" rx="4" fill="#21262d" stroke="#f85149" stroke-width="1"/>
+        <text x="320" y="280" fill="#e6edf3" font-size="9" text-anchor="middle">POST /api/validate-token   <tspan fill="#f85149">[rate]</tspan></text>
+
+        <rect x="220" y="296" width="200" height="24" rx="4" fill="#21262d" stroke="#f85149" stroke-width="1"/>
+        <text x="320" y="312" fill="#e6edf3" font-size="9" text-anchor="middle">POST /api/registrations   <tspan fill="#f85149">[rate]</tspan></text>
+
+        <rect x="220" y="328" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="320" y="344" fill="#e6edf3" font-size="9" text-anchor="middle">GET/POST /api/documents</text>
+
+        <rect x="220" y="360" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="320" y="376" fill="#e6edf3" font-size="9" text-anchor="middle">GET /api/customer  (portal)</text>
+
+        <rect x="220" y="392" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="320" y="408" fill="#e6edf3" font-size="9" text-anchor="middle">POST /api/scan-document</text>
+
+        <!-- ── Admin routes ── -->
+        <rect x="460" y="40" width="230" height="390" rx="8" fill="#1e1a2e" stroke="#bc8cff" stroke-width="1.5"/>
+        <text x="575" y="60" fill="#bc8cff" font-size="10" text-anchor="middle" font-weight="700">ADMIN ROUTES  <tspan fill="#8b949e">[JWT]</tspan></text>
+
+        <rect x="470" y="72" width="210" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="575" y="88" fill="#e6edf3" font-size="9" text-anchor="middle">POST /api/admin/auth/login   <tspan fill="#f85149">[rate]</tspan></text>
+
+        <rect x="470" y="104" width="210" height="24" rx="4" fill="#21262d" stroke="#f85149" stroke-width="1"/>
+        <text x="575" y="120" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/tenants   <tspan fill="#e3b341">[superadmin]</tspan></text>
+
+        <rect x="470" y="136" width="210" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="575" y="152" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/registrations</text>
+
+        <rect x="470" y="168" width="210" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="575" y="184" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/flights</text>
+
+        <rect x="470" y="200" width="210" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="575" y="216" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/payments</text>
+
+        <rect x="470" y="232" width="210" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="575" y="248" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/tokens</text>
+
+        <rect x="470" y="264" width="210" height="24" rx="4" fill="#21262d" stroke="#f85149" stroke-width="1"/>
+        <text x="575" y="280" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/apikeys   <tspan fill="#e3b341">[superadmin]</tspan></text>
+
+        <rect x="470" y="296" width="210" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="575" y="312" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/users</text>
+
+        <rect x="470" y="328" width="210" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="575" y="344" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/tenant-settings</text>
+
+        <rect x="470" y="360" width="210" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="575" y="376" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/simulator</text>
+
+        <rect x="470" y="392" width="210" height="24" rx="4" fill="#21262d" stroke="#f85149" stroke-width="1"/>
+        <text x="575" y="408" fill="#e6edf3" font-size="9" text-anchor="middle">/api/admin/request-log   <tspan fill="#e3b341">[superadmin]</tspan></text>
+
+        <!-- ── Services ── -->
+        <rect x="720" y="40" width="220" height="390" rx="8" fill="#21262d" stroke="#e3b341" stroke-width="1.5"/>
+        <text x="830" y="60" fill="#e3b341" font-size="10" text-anchor="middle" font-weight="700">SERVICES</text>
+
+        <rect x="730" y="72" width="200" height="24" rx="4" fill="#13231a" stroke="#3fb950"/>
+        <text x="830" y="88" fill="#3fb950" font-size="9" text-anchor="middle">db/connection.js  (pg Pool)</text>
+
+        <rect x="730" y="104" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="830" y="120" fill="#e6edf3" font-size="9" text-anchor="middle">encryption.js  (AES-256-GCM)</text>
+
+        <rect x="730" y="136" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="830" y="152" fill="#e6edf3" font-size="9" text-anchor="middle">policyValidator.js  (stub/live)</text>
+
+        <rect x="730" y="168" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="830" y="184" fill="#e6edf3" font-size="9" text-anchor="middle">modulr.js  (Faster Payments)</text>
+
+        <rect x="730" y="200" width="200" height="24" rx="4" fill="#21262d" stroke="#e3b341" stroke-width="1.5"/>
+        <text x="830" y="216" fill="#e3b341" font-size="9" text-anchor="middle">delayProcessor.js  (core payout)</text>
+
+        <rect x="730" y="232" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="830" y="248" fill="#e6edf3" font-size="9" text-anchor="middle">notificationService.js  (email)</text>
+
+        <rect x="730" y="264" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="830" y="280" fill="#e6edf3" font-size="9" text-anchor="middle">oagAlerts.js  (subscriptions)</text>
+
+        <rect x="730" y="296" width="200" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+        <text x="830" y="312" fill="#e6edf3" font-size="9" text-anchor="middle">eventSource.js  (dev/prod switch)</text>
+
+        <rect x="730" y="328" width="200" height="24" rx="4" fill="#21262d" stroke="#bc8cff" stroke-width="1.5"/>
+        <text x="830" y="344" fill="#bc8cff" font-size="9" text-anchor="middle">eventHubConsumer.js  (prod)</text>
+
+        <!-- ── Static file serving ── -->
+        <rect x="20" y="460" width="920" height="100" rx="8" fill="#1a1a1a" stroke="#30363d" stroke-width="1.5"/>
+        <text x="480" y="480" fill="#8b949e" font-size="10" text-anchor="middle" font-weight="600">STATIC FILE SERVING  (SPA fallback routing)</text>
+
+        <rect x="40" y="492" width="200" height="52" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="140" y="513" fill="#e6edf3" font-size="10" text-anchor="middle" font-weight="600">Customer SPA</text>
+        <text x="140" y="529" fill="#8b949e" font-size="9" text-anchor="middle">/ (tenant subdomains)</text>
+        <text x="140" y="541" fill="#8b949e" font-size="9" text-anchor="middle">../customer/index.html</text>
+
+        <rect x="380" y="492" width="200" height="52" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="480" y="513" fill="#e6edf3" font-size="10" text-anchor="middle" font-weight="600">Admin SPA</text>
+        <text x="480" y="529" fill="#8b949e" font-size="9" text-anchor="middle">/admin/*</text>
+        <text x="480" y="541" fill="#8b949e" font-size="9" text-anchor="middle">../admin/index.html</text>
+
+        <rect x="720" y="492" width="200" height="52" rx="5" fill="#21262d" stroke="#30363d"/>
+        <text x="820" y="513" fill="#e6edf3" font-size="10" text-anchor="middle" font-weight="600">Landing Page</text>
+        <text x="820" y="529" fill="#8b949e" font-size="9" text-anchor="middle">/ (base domain, no tenant)</text>
+        <text x="820" y="541" fill="#8b949e" font-size="9" text-anchor="middle">../landing/index.html</text>
+
+        <!-- ── Background service ── -->
+        <rect x="20" y="574" width="920" height="80" rx="8" fill="#13231a" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="60" y="595" fill="#3fb950" font-size="10" font-weight="600">BACKGROUND SERVICE  eventSource.start()  (runs at server startup)</text>
+        <text x="60" y="614" fill="#8b949e" font-size="9">Production: Azure Event Hub consumer (4 partitions, AMQP, checkpoint to Blob Storage)</text>
+        <text x="60" y="630" fill="#8b949e" font-size="9">Development: 30s DB poller — SELECT unprocessed flight_events WHERE processed_at IS NULL</text>
+        <text x="60" y="646" fill="#8b949e" font-size="9">Both modes call delayProcessor.processEvent() per event. Graceful shutdown on SIGTERM commits final checkpoint.</text>
+
+        <!-- Arrows: MW → routes -->
+        <line x1="180" y1="240" x2="208" y2="240" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#app-arrow)"/>
+        <line x1="180" y1="240" x2="190" y2="240" stroke="#58a6ff" stroke-width="1"/>
+        <line x1="190" y1="100" x2="190" y2="380" stroke="#58a6ff" stroke-width="1"/>
+        <line x1="190" y1="100" x2="208" y2="100" stroke="#58a6ff" stroke-width="1" marker-end="url(#app-arrow)"/>
+        <line x1="190" y1="380" x2="208" y2="380" stroke="#58a6ff" stroke-width="1" marker-end="url(#app-arrow)"/>
+        <line x1="450" y1="240" x2="458" y2="240" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#app-arrow)"/>
+      </svg>
+    </div>
+
+    <h3>Multi-tenancy resolution</h3>
+    <p>
+      Every request passes through <code>resolveTenant.js</code>. It strips the subdomain from
+      the <code>Host</code> header, looks up the tenant slug in the DB, and attaches the full
+      tenant row to <code>req.tenant</code>. A 30-second in-memory Map cache prevents DB hits on
+      every request. Admin routes call <code>adminTenantScope(req)</code> which returns
+      <code>null</code> for superadmin (no WHERE filter) or <code>tenant_id</code> for tenant
+      admins — all scoped queries use this to enforce row-level isolation.
+    </p>
+
+    <h3>Payout engine — delayProcessor.js</h3>
+    <p>
+      When a flight event arrives (cancellation or delay beyond the tenant's threshold), the processor:
+    </p>
+    <ol style="margin-left:20px;line-height:2">
+      <li>Finds all active <code>flight_registrations</code> linked to the subscription (may span multiple tenants)</li>
+      <li>Checks idempotency — skips if a <code>paid</code> or <code>processing</code> payment already exists</li>
+      <li>Decrypts AES-256-GCM bank details (sort code + account number) — only decrypted at this point</li>
+      <li>Inserts a <code>payments</code> row in <code>processing</code> state before calling Modulr</li>
+      <li>Calls <code>modulr.sendPayment()</code> via NAT Gateway static IP</li>
+      <li>On success: wraps <code>UPDATE payments</code>, <code>UPDATE flight_registrations</code>, and conditional <code>UPDATE registrations</code> in a DB transaction</li>
+      <li>Fires <code>sendPayoutNotification()</code> (fire-and-forget email via ACS SMTP)</li>
+    </ol>
+  </section>
+
+  <!-- ═══════════════════ 8. CI/CD ═══════════════════ -->
+  <section id="cicd">
+    <h2>8. CI/CD Pipeline</h2>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 920 320" width="100%" xmlns="http://www.w3.org/2000/svg" style="max-width:920px;display:block;margin:auto">
+        <defs>
+          <marker id="ci-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#e3b341"/>
+          </marker>
+          <marker id="ci-arrow-g" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#3fb950"/>
+          </marker>
+        </defs>
+        <rect width="920" height="320" fill="#161b22"/>
+
+        <!-- Step boxes -->
+        <!-- 1: Push -->
+        <rect x="20" y="100" width="120" height="80" rx="8" fill="#21262d" stroke="#e3b341" stroke-width="1.5"/>
+        <text x="80" y="130" fill="#e3b341" font-size="12" text-anchor="middle" font-weight="700">git push</text>
+        <text x="80" y="148" fill="#8b949e" font-size="9" text-anchor="middle">branch: main</text>
+        <text x="80" y="163" fill="#8b949e" font-size="9" text-anchor="middle">GitHub repo</text>
+        <text x="80" y="175" fill="#8b949e" font-size="9" text-anchor="middle">neilfrostergo/fdv2</text>
+
+        <!-- Arrow 1→2 -->
+        <line x1="140" y1="140" x2="168" y2="140" stroke="#e3b341" stroke-width="1.5" marker-end="url(#ci-arrow)"/>
+        <text x="154" y="133" fill="#8b949e" font-size="8" text-anchor="middle">on: push</text>
+
+        <!-- 2: Checkout + test -->
+        <rect x="170" y="80" width="130" height="120" rx="8" fill="#21262d" stroke="#e3b341" stroke-width="1.5"/>
+        <text x="235" y="103" fill="#e3b341" font-size="11" text-anchor="middle" font-weight="700">GitHub Actions</text>
+        <text x="235" y="120" fill="#8b949e" font-size="9" text-anchor="middle">ubuntu-latest runner</text>
+        <rect x="180" y="128" width="110" height="20" rx="3" fill="#13231a" stroke="#3fb950"/>
+        <text x="235" y="142" fill="#3fb950" font-size="9" text-anchor="middle">npm ci  +  npm test</text>
+        <rect x="180" y="155" width="110" height="20" rx="3" fill="#1c2540" stroke="#1f6feb"/>
+        <text x="235" y="169" fill="#58a6ff" font-size="9" text-anchor="middle">OIDC → Azure login</text>
+        <text x="235" y="190" fill="#8b949e" font-size="8" text-anchor="middle">No stored secrets</text>
+
+        <!-- Arrow 2→3 -->
+        <line x1="300" y1="140" x2="328" y2="140" stroke="#e3b341" stroke-width="1.5" marker-end="url(#ci-arrow)"/>
+        <text x="314" y="133" fill="#8b949e" font-size="8" text-anchor="middle">tests pass</text>
+
+        <!-- 3: Docker build -->
+        <rect x="330" y="80" width="140" height="120" rx="8" fill="#21262d" stroke="#e3b341" stroke-width="1.5"/>
+        <text x="400" y="103" fill="#e3b341" font-size="11" text-anchor="middle" font-weight="700">Docker build</text>
+        <text x="400" y="120" fill="#8b949e" font-size="9" text-anchor="middle">Multi-stage Dockerfile</text>
+        <text x="400" y="136" fill="#8b949e" font-size="9" text-anchor="middle">node:20-slim base (ARM64)</text>
+        <text x="400" y="152" fill="#8b949e" font-size="9" text-anchor="middle">bcryptjs (no native addon)</text>
+        <text x="400" y="168" fill="#8b949e" font-size="9" text-anchor="middle">Tags: :sha + :latest</text>
+        <rect x="340" y="178" width="120" height="14" rx="3" fill="#1c2540" stroke="#1f6feb"/>
+        <text x="400" y="189" fill="#58a6ff" font-size="8" text-anchor="middle">az acr login --name fdv2acr</text>
+
+        <!-- Arrow 3→4 -->
+        <line x1="470" y1="140" x2="498" y2="140" stroke="#e3b341" stroke-width="1.5" marker-end="url(#ci-arrow)"/>
+        <text x="484" y="133" fill="#8b949e" font-size="8" text-anchor="middle">push</text>
+
+        <!-- 4: ACR -->
+        <rect x="500" y="80" width="130" height="120" rx="8" fill="#1a2332" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="565" y="103" fill="#58a6ff" font-size="11" text-anchor="middle" font-weight="700">fdv2acr</text>
+        <text x="565" y="120" fill="#8b949e" font-size="9" text-anchor="middle">Azure Container Registry</text>
+        <text x="565" y="136" fill="#8b949e" font-size="9" text-anchor="middle">fdv2-app:&lt;sha&gt;</text>
+        <text x="565" y="152" fill="#8b949e" font-size="9" text-anchor="middle">fdv2-app:latest</text>
+        <text x="565" y="168" fill="#8b949e" font-size="9" text-anchor="middle">Private · VNet pull</text>
+        <text x="565" y="184" fill="#8b949e" font-size="9" text-anchor="middle">Managed Identity auth</text>
+
+        <!-- Arrow 4→5 -->
+        <line x1="630" y1="140" x2="658" y2="140" stroke="#e3b341" stroke-width="1.5" marker-end="url(#ci-arrow)"/>
+        <text x="644" y="133" fill="#8b949e" font-size="8" text-anchor="middle">deploy</text>
+
+        <!-- 5: Container Apps update -->
+        <rect x="660" y="80" width="150" height="120" rx="8" fill="#1a2332" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="735" y="103" fill="#3fb950" font-size="11" text-anchor="middle" font-weight="700">Container Apps</text>
+        <text x="735" y="120" fill="#8b949e" font-size="9" text-anchor="middle">az containerapp update</text>
+        <text x="735" y="136" fill="#8b949e" font-size="9" text-anchor="middle">--image fdv2-app:&lt;sha&gt;</text>
+        <text x="735" y="152" fill="#8b949e" font-size="9" text-anchor="middle">Rolling revision deploy</text>
+        <text x="735" y="168" fill="#8b949e" font-size="9" text-anchor="middle">Zero-downtime (traffic split)</text>
+        <text x="735" y="184" fill="#8b949e" font-size="9" text-anchor="middle">Rollback: point to prev rev</text>
+
+        <!-- Arrow 5→6 -->
+        <line x1="810" y1="140" x2="838" y2="140" stroke="#3fb950" stroke-width="1.5" marker-end="url(#ci-arrow-g)"/>
+
+        <!-- 6: Live -->
+        <rect x="840" y="100" width="60" height="80" rx="8" fill="#13231a" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="870" y="130" fill="#3fb950" font-size="11" text-anchor="middle" font-weight="700">LIVE</text>
+        <text x="870" y="150" fill="#8b949e" font-size="8" text-anchor="middle">*.delayedpaid</text>
+        <text x="870" y="162" fill="#8b949e" font-size="8" text-anchor="middle">.co.uk</text>
+
+        <!-- Notes below -->
+        <rect x="170" y="225" width="620" height="72" rx="6" fill="#21262d" stroke="#30363d"/>
+        <text x="190" y="245" fill="#e3b341" font-size="10" font-weight="600">OIDC Workload Identity (no stored secrets)</text>
+        <text x="190" y="262" fill="#8b949e" font-size="9">GitHub Actions authenticates to Azure using OIDC federated credential. No client secret stored in GitHub.</text>
+        <text x="190" y="278" fill="#8b949e" font-size="9">GitHub secrets required: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID (non-sensitive identity references only).</text>
+        <text x="190" y="292" fill="#8b949e" font-size="9">Migrations must be run separately (see runbook) — deploy.yml does not run migrate.</text>
+      </svg>
+    </div>
+
+    <h3>Workflow file</h3>
+    <p><code>.github/workflows/deploy.yml</code> — triggers on <code>push</code> to <code>main</code>.</p>
+    <pre><code>jobs:
+  build-and-deploy:
+    steps:
+      1. actions/checkout@v4
+      2. actions/setup-node@v4  (node 20, cache npm)
+      3. npm ci  (working-dir: server/)
+      4. npm test --if-present
+      5. azure/login@v2  (OIDC — AZURE_CLIENT_ID / TENANT_ID / SUBSCRIPTION_ID)
+      6. az acr login --name fdv2acr
+      7. docker build  →  push :sha + :latest  →  fdv2acr.azurecr.io/fdv2-app
+      8. az containerapp update --name fdv2-app --resource-group fdv2-prod-rg --image :sha</code></pre>
+
+    <div class="callout callout-warning">
+      Migrations are NOT run automatically by the CI pipeline. Run them manually before deploying schema changes (see Runbook section).
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 9. SECURITY ═══════════════════ -->
+  <section id="security">
+    <h2>9. Security Controls</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Control</th><th>Mechanism</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>No public application IP</td>
+            <td>Container Apps uses external ingress accepted only from Front Door Private Link. No public load balancer IP on the ACA environment.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Web Application Firewall</td>
+            <td>Azure Front Door Premium — OWASP 2.1 ruleset, Prevention mode. Blocks SQLi, XSS, and other OWASP Top 10 attacks at the edge.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>DDoS protection</td>
+            <td>Front Door Premium includes DDoS Standard. Traffic absorbs at Microsoft's global network before reaching origin.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Secrets management</td>
+            <td>Azure Key Vault (private endpoint, no public access). Container accesses secrets via Managed Identity — no credentials in environment variables or image layers.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Database private access</td>
+            <td>PostgreSQL Flexible Server VNet-injected into <code>fdv2-data-subnet</code>. No public endpoint. DNS A-record resolves to 10.100.8.5 only inside VNet.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>TLS everywhere</td>
+            <td>Front Door terminates external TLS (auto-renewed cert). Internal VNet traffic does not require re-encryption. Event Hub AMQP over TLS via private endpoint.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Static egress IP</td>
+            <td>NAT Gateway routes all container outbound traffic through 20.50.124.92. Enables IP whitelisting at Modulr, OAG, and Ergo Connect.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Bank detail encryption</td>
+            <td>Sort codes and account numbers encrypted with AES-256-GCM before database insert (<code>encryption.js</code>). Never returned in API responses. Only decrypted inside <code>delayProcessor.js</code> immediately before Modulr payment call.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>JWT authentication</td>
+            <td>Admin routes require Bearer JWT signed with <code>JWT_SECRET</code> (8h expiry). Payload: <code>{ sub, username, role, tenant_id }</code>. Superadmin has <code>tenant_id: null</code>.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Password hashing</td>
+            <td>bcryptjs with 12 rounds. Pure JS implementation used for ARM64 Container Apps host compatibility.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Rate limiting</td>
+            <td>Three in-process Express rate limiter pools: <code>registrationLimiter</code>, <code>validateLimiter</code>, <code>loginLimiter</code>. Keyed by IP address.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>CORS</td>
+            <td>Admin API restricted to <code>ADMIN_CORS_ORIGIN</code>. Public customer API is open (serves white-labeled tenant SPAs from any subdomain).</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>CSP headers</td>
+            <td>Helmet.js enforces Content Security Policy. <code>upgrade-insecure-requests</code> enabled in production. Script/style sources restricted.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Container image supply chain</td>
+            <td>Images built in GitHub Actions and pushed to private ACR. No image pulled from public registry in production. ACR pull via Managed Identity.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>CI/CD credential security</td>
+            <td>OIDC Workload Identity Federation — GitHub Actions authenticates to Azure with a short-lived OIDC token. No long-lived client secret stored anywhere.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Audit logging</td>
+            <td>All <code>/api/*</code> requests written to <code>request_log</code> table (tenant, status, duration). Admin sensitive actions (key reveals, simulations, status patches) written to <code>audit_log</code>. 90-day retention in Log Analytics.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Tenant data isolation</td>
+            <td>All admin queries scoped by <code>adminTenantScope(req)</code>. Tenant admin cannot read other tenants' data. Superadmin (tenant_id = NULL) has unrestricted access.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Event Hub public access</td>
+            <td>Event Hub Namespace has public access disabled. OAG ingests events via private endpoint 10.100.9.5 inside VNet.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+          <tr>
+            <td>Alert rules</td>
+            <td>Azure Monitor alert rules on container restart count and 5xx error rate. Notifications to configured email / PagerDuty.</td>
+            <td><span class="badge badge-green">Active</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 10. CREDENTIALS & ENDPOINTS ═══════════════════ -->
+  <section id="credentials">
+    <h2>10. Credentials &amp; Endpoints Reference</h2>
+
+    <div class="callout callout-warning">
+      All passwords and secret values are stored in Azure Key Vault (<code>fdv2-keyvault</code>).
+      This document shows only structure and placeholder references — actual values are [REDACTED].
+    </div>
+
+    <h3>Key Vault secrets</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Secret name</th><th>Purpose</th><th>Format</th></tr></thead>
+        <tbody>
+          <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL connection string</td><td><code>postgresql://&lt;user&gt;:[REDACTED]@10.100.8.5:5432/&lt;db&gt;</code></td></tr>
+          <tr><td><code>JWT_SECRET</code></td><td>Admin JWT signing key</td><td>64+ random chars [REDACTED]</td></tr>
+          <tr><td><code>ENCRYPTION_KEY</code></td><td>AES-256-GCM bank detail encryption</td><td>Exactly 64 hex chars (32 bytes) [REDACTED]</td></tr>
+          <tr><td><code>SMTP_HOST</code></td><td>ACS SMTP relay hostname</td><td><code>smtp.azurecomm.net</code></td></tr>
+          <tr><td><code>SMTP_PORT</code></td><td>ACS SMTP port</td><td><code>587</code></td></tr>
+          <tr><td><code>SMTP_USER</code></td><td>ACS SMTP username</td><td>[REDACTED]</td></tr>
+          <tr><td><code>SMTP_PASS</code></td><td>ACS SMTP password</td><td>[REDACTED]</td></tr>
+          <tr><td><code>event-hub-connection-string</code></td><td>Event Hub consumer connection string</td><td>Endpoint=sb://fdv2-eventhub.servicebus.windows.net/;... [REDACTED]</td></tr>
+          <tr><td><code>event-hub-storage-connection-string</code></td><td>Blob checkpoint storage</td><td>DefaultEndpointsProtocol=https;AccountName=fdv2prodsa;... [REDACTED]</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>GitHub Actions secrets (OIDC — non-sensitive)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Secret name</th><th>Value type</th></tr></thead>
+        <tbody>
+          <tr><td><code>AZURE_CLIENT_ID</code></td><td>App registration / managed identity client ID (GUID)</td></tr>
+          <tr><td><code>AZURE_TENANT_ID</code></td><td>Azure AD tenant ID (GUID)</td></tr>
+          <tr><td><code>AZURE_SUBSCRIPTION_ID</code></td><td>Azure subscription ID (GUID)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Public endpoints</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>URL</th><th>Purpose</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>https://delayedpaid.co.uk</code></td><td>Landing page (base domain)</td><td>Pending DNS propagation</td></tr>
+          <tr><td><code>https://&lt;tenant&gt;.delayedpaid.co.uk</code></td><td>Customer registration SPA</td><td>Wildcard CNAME → Front Door</td></tr>
+          <tr><td><code>https://&lt;tenant&gt;.delayedpaid.co.uk/admin</code></td><td>Admin SPA</td><td>JWT required</td></tr>
+          <tr><td><code>https://&lt;tenant&gt;.delayedpaid.co.uk/api/health</code></td><td>Health check (Front Door probe)</td><td>Returns <code>{"status":"ok"}</code></td></tr>
+          <tr><td><code>fdv2-endpoint-b7fsdzfedegeh8dv.a03.azurefd.net</code></td><td>Front Door endpoint (raw)</td><td>Used as CNAME target for DNS</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Private / internal endpoints</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Service</th><th>Address</th><th>Protocol</th></tr></thead>
+        <tbody>
+          <tr><td>PostgreSQL</td><td><code>10.100.8.5:5432</code></td><td>TCP (pg wire)</td></tr>
+          <tr><td>Event Hub (private endpoint)</td><td><code>10.100.9.5</code></td><td>AMQP/TLS :5671</td></tr>
+          <tr><td>Key Vault (private endpoint)</td><td>10.100.9.x</td><td>HTTPS :443</td></tr>
+          <tr><td>Container App (from Front Door)</td><td>Private Link (no IP exposed)</td><td>HTTP :80 (PL)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Outbound static IP</h3>
+    <p>
+      All outbound traffic from the Container App exits through NAT Gateway with static IP
+      <strong>20.50.124.92</strong>. Whitelist this IP at Modulr, OAG, and Ergo Connect (policy API).
+    </p>
+  </section>
+
+  <!-- ═══════════════════ 11. RUNBOOK ═══════════════════ -->
+  <section id="runbook">
+    <h2>11. Operational Runbook</h2>
+
+    <h3>Deploy a new release</h3>
+    <p>Push to <code>main</code> — the GitHub Actions workflow handles the rest automatically. To monitor:</p>
+    <pre><code># Watch the workflow
+gh run watch --repo neilfrostergo/flight-delay-v2
+
+# Verify the new revision is active
+az containerapp revision list \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --output table</code></pre>
+
+    <h3>Run database migrations</h3>
+    <div class="callout callout-warning">Always run migrations before deploying a schema-changing release. The CI pipeline does NOT run migrations automatically.</div>
+    <pre><code># Option A: exec into a running container replica
+az containerapp exec \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --command "node src/db/migrate.js"
+
+# Option B: run a one-off job in Container Apps (recommended for production)
+az containerapp job create \
+  --name fdv2-migrate \
+  --resource-group fdv2-prod-rg \
+  --environment fdv2-aca-env \
+  --trigger-type Manual \
+  --image fdv2acr.azurecr.io/fdv2-app:latest \
+  --command "node" "src/db/migrate.js"
+
+az containerapp job start --name fdv2-migrate --resource-group fdv2-prod-rg</code></pre>
+
+    <h3>Seed superadmin (first-time setup)</h3>
+    <pre><code># Requires ADMIN_SEED_PASSWORD environment variable to be set on the container
+az containerapp exec \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --command "node src/db/seedAdmin.js"</code></pre>
+
+    <h3>Check application logs</h3>
+    <pre><code># Tail live logs from Container Apps
+az containerapp logs show \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --follow
+
+# Query Log Analytics (last 100 errors)
+az monitor log-analytics query \
+  --workspace fdv2-logs \
+  --analytics-query "ContainerAppConsoleLogs_CL | where Log_s contains 'error' | order by TimeGenerated desc | limit 100"</code></pre>
+
+    <h3>Rollback a deployment</h3>
+    <pre><code># List revisions
+az containerapp revision list \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --output table
+
+# Route 100% traffic to a previous revision
+az containerapp ingress traffic set \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --revision-weight &lt;previous-revision-name&gt;=100</code></pre>
+
+    <h3>Scale replicas manually</h3>
+    <pre><code># Force minimum replicas (e.g. before expected load spike)
+az containerapp update \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --min-replicas 3 \
+  --max-replicas 5</code></pre>
+
+    <h3>Inspect Key Vault secrets (emergency only)</h3>
+    <pre><code># List secrets
+az keyvault secret list --vault-name fdv2-keyvault --output table
+
+# Show a secret value (requires Key Vault Secrets Officer role)
+az keyvault secret show --vault-name fdv2-keyvault --name DATABASE_URL --query value -o tsv</code></pre>
+
+    <h3>Restart all replicas</h3>
+    <pre><code># Restart by deploying a new revision with the current image
+az containerapp update \
+  --name fdv2-app \
+  --resource-group fdv2-prod-rg \
+  --image fdv2acr.azurecr.io/fdv2-app:latest</code></pre>
+  </section>
+
+  <!-- ═══════════════════ 12. TROUBLESHOOTING ═══════════════════ -->
+  <section id="troubleshooting">
+    <h2>12. Troubleshooting</h2>
+
+    <h3>Application cannot connect to PostgreSQL</h3>
+    <div class="card">
+      <h4>Symptoms</h4>
+      <p>Server exits on startup with <code>connection refused</code> or <code>ECONNREFUSED 10.100.8.5:5432</code>.</p>
+      <h4>Checks</h4>
+      <ol style="margin-left:20px;line-height:2">
+        <li>Verify <code>DATABASE_URL</code> secret in Key Vault is correct.</li>
+        <li>Check that Container Apps environment is VNet-integrated with <code>fdv2-aca-subnet</code>.</li>
+        <li>Verify PostgreSQL DNS: inside the container, <code>nslookup fdv2-postgres.postgres.database.azure.com</code> should resolve to <code>10.100.8.5</code>.</li>
+        <li>Check that the PostgreSQL private DNS zone <code>postgres.database.azure.com</code> is linked to <code>fdv2-vnet</code>.</li>
+        <li>Check PostgreSQL firewall — should have no public rules and only VNet access.</li>
+      </ol>
+    </div>
+
+    <h3>Front Door returns 502 Bad Gateway</h3>
+    <div class="card">
+      <h4>Symptoms</h4>
+      <p>Browser receives 502. Front Door health probe shows origin unhealthy.</p>
+      <h4>Checks</h4>
+      <ol style="margin-left:20px;line-height:2">
+        <li>Check Container App is running: <code>az containerapp show --name fdv2-app --resource-group fdv2-prod-rg --query properties.runningStatus</code></li>
+        <li>Check health endpoint directly from a container exec: <code>curl http://localhost:3000/api/health</code></li>
+        <li>Verify Private Link connection is Approved in Front Door origin settings.</li>
+        <li>Check Container Apps environment uses External ingress type (required for Private Link from Front Door).</li>
+        <li>Review container logs for startup errors.</li>
+      </ol>
+    </div>
+
+    <h3>Event Hub consumer not processing events</h3>
+    <div class="card">
+      <h4>Symptoms</h4>
+      <p>Flights trigger no payouts. <code>flight_events</code> rows accumulate with <code>processed_at = NULL</code>.</p>
+      <h4>Checks</h4>
+      <ol style="margin-left:20px;line-height:2">
+        <li>Check logs for <code>[eventHubConsumer]</code> lines. Should show partition ownership on startup.</li>
+        <li>Verify <code>EVENT_HUB_CONNECTION_STRING</code> and <code>EVENT_HUB_STORAGE_CONNECTION_STRING</code> secrets are set and valid.</li>
+        <li>Verify Event Hub private endpoint is approved: <code>az network private-endpoint-connection list --name fdv2-eventhub --type Microsoft.EventHub/namespaces</code></li>
+        <li>Check checkpoint storage container <code>event-hub-checkpoints</code> exists in <code>fdv2prodsa</code>.</li>
+        <li>Confirm <code>NODE_ENV=production</code> — development mode uses DB poller, not Event Hub consumer.</li>
+      </ol>
+    </div>
+
+    <h3>Tenant not resolved (returns landing page instead of customer SPA)</h3>
+    <div class="card">
+      <h4>Symptoms</h4>
+      <p>Visiting <code>ergo.delayedpaid.co.uk</code> shows the generic landing page, not the tenant's SPA.</p>
+      <h4>Checks</h4>
+      <ol style="margin-left:20px;line-height:2">
+        <li>Verify DNS: <code>dig ergo.delayedpaid.co.uk</code> — should CNAME to Front Door endpoint.</li>
+        <li>Check <code>BASE_DOMAIN</code> env var is set to <code>delayedpaid.co.uk</code>.</li>
+        <li>Verify tenant row exists in DB: <code>SELECT slug, is_active FROM tenants WHERE slug = 'ergo';</code></li>
+        <li>If recently updated, tenant cache TTL is 30s — wait or call <code>invalidateTenantCache(slug)</code> by restarting the container.</li>
+      </ol>
+    </div>
+
+    <h3>CI/CD deployment fails at Azure login step</h3>
+    <div class="card">
+      <h4>Symptoms</h4>
+      <p>GitHub Actions step <code>Log in to Azure</code> fails with authentication error.</p>
+      <h4>Checks</h4>
+      <ol style="margin-left:20px;line-height:2">
+        <li>Verify <code>AZURE_CLIENT_ID</code>, <code>AZURE_TENANT_ID</code>, <code>AZURE_SUBSCRIPTION_ID</code> secrets are set in the GitHub repository settings.</li>
+        <li>Verify the GitHub Actions workflow has <code>permissions: id-token: write</code>.</li>
+        <li>Check the OIDC federated credential on the app registration is configured for the correct repo and branch (<code>repo:neilfrostergo/flight-delay-v2:ref:refs/heads/main</code>).</li>
+        <li>Verify the managed identity / service principal has <code>AcrPush</code> on <code>fdv2acr</code> and <code>ContainerApp Contributor</code> on <code>fdv2-prod-rg</code>.</li>
+      </ol>
+    </div>
+
+    <h3>Payout fails — payment stuck in processing state</h3>
+    <div class="card">
+      <h4>Symptoms</h4>
+      <p>Payment row has <code>status = 'processing'</code> and does not update. No paid email received by customer.</p>
+      <h4>Checks</h4>
+      <ol style="margin-left:20px;line-height:2">
+        <li>Check <code>[delayProcessor]</code> log lines for the flight registration ID.</li>
+        <li>Verify outbound traffic is routing through NAT Gateway: Modulr should see requests from <code>20.50.124.92</code>.</li>
+        <li>Verify Modulr API key for the tenant is correctly encrypted and stored in DB (<code>modulr_api_key_enc</code> column on <code>tenants</code>).</li>
+        <li>Check <code>payments.failure_reason</code> column for any error message written by Modulr.</li>
+        <li>Use the admin <code>/api/admin/payments</code> retry endpoint to re-attempt.</li>
+      </ol>
+    </div>
+
+    <h3>Useful commands quick reference</h3>
+    <pre><code># Container status
+az containerapp show -n fdv2-app -g fdv2-prod-rg --query "properties.runningStatus" -o tsv
+
+# Current image
+az containerapp show -n fdv2-app -g fdv2-prod-rg --query "properties.template.containers[0].image" -o tsv
+
+# Replica count
+az containerapp replica list -n fdv2-app -g fdv2-prod-rg --output table
+
+# PostgreSQL connection test (from container exec)
+psql $DATABASE_URL -c "SELECT version();"
+
+# Key Vault secret names
+az keyvault secret list --vault-name fdv2-keyvault --query "[].name" -o tsv
+
+# Front Door backend health
+az afd origin show --profile-name fdv2-frontdoor --origin-group-name default -g fdv2-prod-rg
+
+# Alert rules
+az monitor metrics alert list -g fdv2-prod-rg --output table</code></pre>
+  </section>
+
+  <div style="margin-top:60px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-muted);font-size:12px;">
+    Flight Delay v2 — Internal Architecture Reference &nbsp;|&nbsp; Resource group: <code>fdv2-prod-rg</code> &nbsp;|&nbsp; UK South &nbsp;|&nbsp; Generated: 2026-04-01 &nbsp;|&nbsp; <span class="badge badge-yellow">Internal use only</span>
+  </div>
+
+</main>
+
+<script>
+  // Highlight active nav link on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.sidebar nav a');
+
+  function updateNav() {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 80) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }
+
+  window.addEventListener('scroll', updateNav, { passive: true });
+  updateNav();
+</script>
+</body>
+</html>
