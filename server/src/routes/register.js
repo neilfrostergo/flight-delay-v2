@@ -33,6 +33,9 @@ const registrationSchema = Joi.object({
   bank_account:            Joi.string().trim().replace(/\D/g, '').length(8).required(),
   flights:                 Joi.array().items(flightSchema).min(1).max(10).required(),
   pre_validation_token_id: Joi.number().integer().allow(null).optional(),
+  policy_type:             Joi.string().trim().max(50).allow(null).optional(),
+  travelers:               Joi.array().items(Joi.object()).allow(null).optional(),
+  cover_summary:           Joi.array().items(Joi.object()).allow(null).optional(),
 });
 
 // POST /api/registrations
@@ -91,8 +94,9 @@ router.post('/', async (req, res) => {
            (tenant_id, policy_number, first_name, last_name, email,
             payout_pence, cover_start_date, cover_end_date,
             bank_sort_code_enc, bank_account_enc,
-            pre_validation_token_id, ip_address, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::inet,'active')
+            pre_validation_token_id, ip_address, status,
+            policy_type, travelers, cover_summary)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::inet,'active',$13,$14,$15)
          ON CONFLICT (tenant_id, policy_number) DO NOTHING
          RETURNING id, policy_number, created_at`,
         [
@@ -108,6 +112,9 @@ router.post('/', async (req, res) => {
           encrypt(value.bank_account),
           value.pre_validation_token_id || null,
           ip,
+          value.policy_type  || null,
+          value.travelers    ? JSON.stringify(value.travelers)    : null,
+          value.cover_summary ? JSON.stringify(value.cover_summary) : null,
         ]
       );
 

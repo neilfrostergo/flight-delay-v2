@@ -83,6 +83,9 @@ router.post('/sessions', async (req, res) => {
         payout_pence:     policyResult.payoutPence,
         cover_start_date: policyResult.coverStartDate || null,
         cover_end_date:   policyResult.coverEndDate   || null,
+        policy_type:      policyResult.policyType     || null,
+        travelers:        policyResult.travelers       || null,
+        cover_summary:    policyResult.coverSummary    || null,
         tenant_id:        req.tenant.id,
         type:             'customer',
       },
@@ -93,8 +96,24 @@ router.post('/sessions', async (req, res) => {
   }
 
   const registrationId = result.rows[0].id;
+
+  // Fetch policy detail fields to include in the JWT payload
+  const regDetail = await query(
+    `SELECT policy_type, travelers, cover_summary
+     FROM registrations WHERE id = $1`,
+    [registrationId]
+  );
+  const regDetailRow = regDetail.rows[0] || {};
+
   const token = jwt.sign(
-    { sub: registrationId, tenant_id: req.tenant.id, type: 'customer' },
+    {
+      sub:          registrationId,
+      tenant_id:    req.tenant.id,
+      type:         'customer',
+      policy_type:  regDetailRow.policy_type  || null,
+      travelers:    regDetailRow.travelers     || null,
+      cover_summary: regDetailRow.cover_summary || null,
+    },
     config.jwt.secret,
     { expiresIn: '24h' }
   );
@@ -119,6 +138,9 @@ router.get('/registration', requireCustomer, async (req, res) => {
       payout_pence:     req.customer.payout_pence,
       cover_start_date: req.customer.cover_start_date || null,
       cover_end_date:   req.customer.cover_end_date   || null,
+      policy_type:      req.customer.policy_type      || null,
+      travelers:        req.customer.travelers         || null,
+      cover_summary:    req.customer.cover_summary     || null,
       status:           'not_registered',
       flights:          [],
     });
@@ -126,7 +148,8 @@ router.get('/registration', requireCustomer, async (req, res) => {
 
   const regResult = await query(
     `SELECT id, policy_number, first_name, last_name, email,
-            payout_pence, cover_start_date, cover_end_date, status, created_at
+            payout_pence, cover_start_date, cover_end_date, status, created_at,
+            policy_type, travelers, cover_summary
      FROM registrations WHERE id = $1 AND tenant_id = $2`,
     [req.customer.sub, req.tenant.id]
   );
