@@ -1388,7 +1388,8 @@
         <div id="portal-login-error" class="alert alert-error" style="display:none;margin-bottom:16px"></div>
         <div class="field">
           <label for="portal-policy-input">Policy number</label>
-          <input id="portal-policy-input" type="text" placeholder="e.g. POL-001-ACTIVE" autocomplete="off">
+          <input id="portal-policy-input" type="text" placeholder="e.g. POL-001-ACTIVE" autocomplete="off"
+                 onkeydown="if(event.key==='Enter')portalLogin()">
         </div>
         <div class="field">
           <label for="portal-email-input">Email address on your policy</label>
