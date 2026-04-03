@@ -91,17 +91,51 @@ Once the certificate is issued, test the tenant:
 
 ## UAT tenants
 
-For UAT, the wildcard `*.uat.delayedpaid.co.uk` routes to the UAT Container App. UAT uses a single shared TLS certificate managed separately — no per-tenant DNS or certificate step is needed for UAT.
+The wildcard `*.uat.delayedpaid.co.uk` routes to the UAT Container App, but each UAT subdomain still needs its own TLS certificate. UAT subdomains also require an extra DNS TXT record for Azure domain verification (because the CNAME is a wildcard, not a direct match).
 
-To test a tenant on UAT, simply use `SLUG.uat.delayedpaid.co.uk`. The tenant must exist in the UAT database (either created via the UAT admin panel, or seeded via migration).
+Run the following for each new UAT tenant, replacing `SLUG`:
+
+```bash
+# 1. Add the domain verification TXT record (get the token from the error output of step 2 if needed)
+az network dns record-set txt add-record \
+  --resource-group fdv2-prod-rg \
+  --zone-name delayedpaid.co.uk \
+  --record-set-name "asuid.SLUG.uat" \
+  --value "<TOKEN FROM AZURE>"
+
+# 2. Register the hostname (run this first to get the token if you don't have it)
+az containerapp hostname add \
+  --name fdv2-uat-app \
+  --resource-group fdv2-uat-rg \
+  --hostname SLUG.uat.delayedpaid.co.uk
+
+# 3. Issue and bind a managed TLS certificate
+az containerapp hostname bind \
+  --name fdv2-uat-app \
+  --resource-group fdv2-uat-rg \
+  --hostname SLUG.uat.delayedpaid.co.uk \
+  --environment fdv2-uat-aca-env \
+  --validation-method CNAME
+```
+
+**Getting the TXT token:** Run step 2 first — if the TXT record is missing, Azure will return an error message containing the required token value. Copy it, add the TXT record (step 1), then re-run step 2.
+
+To check certificate status:
+
+```bash
+az containerapp hostname list \
+  --name fdv2-uat-app \
+  --resource-group fdv2-uat-rg \
+  --output table
+```
 
 ---
 
 ## Existing tenants
 
-| Tenant | Production URL | Status |
-|--------|---------------|--------|
-| ERGO | https://ergo.delayedpaid.co.uk | Live |
+| Tenant | Production URL | UAT URL | Status |
+|--------|---------------|---------|--------|
+| ERGO | https://ergo.delayedpaid.co.uk | https://ergo.uat.delayedpaid.co.uk | Live |
 
 ---
 
