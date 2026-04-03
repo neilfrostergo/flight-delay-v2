@@ -2007,6 +2007,8 @@ function renderFlightResults(flights, date) {
         <span class="flight-meta-item">🕐 ${f.depTime || '—'} → ${f.arrTime || '—'}</span>
         ${f.duration ? `<span class="flight-meta-item">⏱ ${f.duration}</span>` : ''}
       </div>
+      ${f.tooSoon ? `<div class="alert alert-error" style="margin-top:8px;font-size:12px">Too close to departure — must register at least ${state.minHoursBeforeDep || 24}h before.</div>` : ''}
+      ${f.tooFar  ? `<div class="alert alert-error" style="margin-top:8px;font-size:12px">Too far in advance — maximum ${state.maxDaysBeforeDep || 40} days before departure.</div>` : ''}
     </div>
   `).join('');
 }

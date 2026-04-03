@@ -102,39 +102,79 @@ router.get('/route', async (req, res) => {
   const dep = origin.trim().toUpperCase();
   const arr = destination.trim().toUpperCase();
 
-  // Stub: generate plausible flights for any route.
-  // A live implementation would call an OAG schedules/route endpoint here.
-  const carriers = ['BA', 'VS', 'AA', 'UA'];
-  const slots    = [['07:15','10:05'], ['10:40','13:30'], ['13:55','16:45'], ['17:20','20:10']];
+  let oagKey;
+  try { oagKey = await getOagKey(); } catch (err) {
+    console.error('[flight-lookup/route] Key lookup error:', err.message);
+    return res.status(503).json({ flights: [], error: 'Flight lookup service unavailable' });
+  }
+
+  if (!oagKey) {
+    return res.json({ flights: [], stub: true });
+  }
+
+  const params = new URLSearchParams({
+    DepartureStation:  dep,
+    ArrivalStation:    arr,
+    DepartureDateTime: date,
+    CodeType:          'IATA',
+    version:           'v2',
+  });
+
+  let oagData;
+  try {
+    const oagRes = await fetch(
+      `https://api.oag.com/flight-schedules/v2/schedules?${params}`,
+      {
+        headers: { 'Subscription-Key': oagKey },
+        signal: AbortSignal.timeout(15000),
+      }
+    );
+    if (oagRes.status === 404 || oagRes.status === 204) {
+      return res.json({ flights: [] });
+    }
+    if (!oagRes.ok) {
+      throw new Error(`OAG HTTP ${oagRes.status}`);
+    }
+    oagData = await oagRes.json();
+  } catch (err) {
+    console.error('[flight-lookup/route] OAG API error:', err.message);
+    if (!config.isProduction) {
+      return res.json({ flights: [], stub: true });
+    }
+    return res.status(502).json({ flights: [], error: 'Flight data unavailable' });
+  }
+
+  const raw = Array.isArray(oagData?.data) ? oagData.data : [];
 
   const [depNameStr, arrNameStr] = await Promise.all([airportName(dep), airportName(arr)]);
 
-  const flights = slots.map(([ depTime, arrTime ], i) => {
-    const code = carriers[i % carriers.length];
-    const num  = 100 + (i + 1) * 77;
-    const [dh, dm] = depTime.split(':').map(Number);
-    const [ah, am] = arrTime.split(':').map(Number);
-    let mins = (ah * 60 + am) - (dh * 60 + dm);
-    if (mins < 0) mins += 24 * 60;
+  const flights = raw.slice(0, 12).map(f => {
+    const carrierCode = f.carrier?.iata || f.marketingCarrier?.iata || '';
+    const flightNum   = f.flightNumber  || f.marketingFlightNumber  || '';
+    const depTime     = f.departure?.time?.local || f.departure?.scheduledTime?.local || null;
+    const arrTime     = f.arrival?.time?.local   || f.arrival?.scheduledTime?.local   || null;
+    const depDate     = f.departure?.date?.local || date;
+    const arrDate     = f.arrival?.date?.local   || date;
+    const { status, statusClass } = parseStatus(f.statusDetails || []);
     return {
-      found: true,
-      carrier: code,
-      number: `${code}${num}`,
-      carrierCode: code,
-      depIata: dep,
-      depName: depNameStr,
+      found:        true,
+      carrier:      carrierCode,
+      number:       `${carrierCode}${flightNum}`,
+      carrierCode,
+      depIata:      f.departure?.airport?.iata || dep,
+      depName:      depNameStr,
       depTime,
-      depDate: date,
-      arrIata: arr,
-      arrName: arrNameStr,
+      depDate,
+      arrIata:      f.arrival?.airport?.iata   || arr,
+      arrName:      arrNameStr,
       arrTime,
-      arrDate: date,
-      duration: `${Math.floor(mins / 60)}h ${mins % 60}m`,
-      status: 'Scheduled',
-      statusClass: 'status-ontime',
-      tooSoon: calcTooSoon(req.tenant, date, depTime),
-      tooFar:  calcTooFar(req.tenant, date),
-      stub: true,
+      arrDate,
+      duration:     fmtDuration(f.elapsedTime),
+      aircraftIata: f.aircraftType?.iata || null,
+      status,
+      statusClass,
+      tooSoon: calcTooSoon(req.tenant, depDate, depTime),
+      tooFar:  calcTooFar(req.tenant, depDate),
     };
   });
 
