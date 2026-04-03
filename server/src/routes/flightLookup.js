@@ -118,24 +118,28 @@ router.get('/route', async (req, res) => {
     DepartureDateTime: date,
     CodeType:          'IATA',
     version:           'v2',
+    limit:             '20',
   });
 
   let oagData;
+  const oagUrl = `https://api.oag.com/flight-instances?${params}`;
   try {
-    const oagRes = await fetch(
-      `https://api.oag.com/flight-schedules/v2/schedules?${params}`,
-      {
+    const oagRes = await fetch(oagUrl, {
         headers: { 'Subscription-Key': oagKey },
         signal: AbortSignal.timeout(15000),
       }
     );
+    console.log(`[flight-lookup/route] OAG ${oagUrl} → HTTP ${oagRes.status}`);
     if (oagRes.status === 404 || oagRes.status === 204) {
       return res.json({ flights: [] });
     }
     if (!oagRes.ok) {
+      const body = await oagRes.text().catch(() => '');
+      console.error(`[flight-lookup/route] OAG error body: ${body.slice(0, 300)}`);
       throw new Error(`OAG HTTP ${oagRes.status}`);
     }
     oagData = await oagRes.json();
+    console.log(`[flight-lookup/route] OAG returned ${oagData?.data?.length ?? 0} results`);
   } catch (err) {
     console.error('[flight-lookup/route] OAG API error:', err.message);
     if (!config.isProduction) {
