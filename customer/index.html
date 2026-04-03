@@ -7,6 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
+    /* ── Prevent brand-colour flash on load ─────────────────────────────────── */
+    body { visibility: hidden; }
+    body.branding-ready { visibility: visible; animation: fadeIn 0.1s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
     /* ── Design tokens ───────────────────────────────────────────────────────── */
     :root {
       --brand:        #8e0038;
@@ -1486,6 +1491,9 @@ const state = {
     }
   } catch (_) {}
 
+  // Always reveal the page — even if tenant-config failed
+  document.body.classList.add('branding-ready');
+
   renderDemoBox();
 
   // Default dates to tomorrow (flights need 24h notice)
@@ -1520,6 +1528,7 @@ function applyBranding(tenant) {
     document.documentElement.style.setProperty('--brand-dark', darkenHex(tenant.primaryColour, 20));
     document.documentElement.style.setProperty('--brand-light', hexWithAlpha(tenant.primaryColour, 0.08));
   }
+  document.body.classList.add('branding-ready');
   if (tenant.logoUrl) {
     const img = document.createElement('img');
     img.src = tenant.logoUrl;
