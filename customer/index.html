@@ -1087,7 +1087,7 @@
     <div class="header-brand" id="header-brand">Flight Delay Protection</div>
     <div class="header-sub" id="header-sub">Register your flight for automatic payout</div>
   </div>
-  <button class="portal-nav-btn" id="portal-toggle-btn" onclick="togglePortal()">My Account</button>
+  <button class="portal-nav-btn" id="portal-toggle-btn" onclick="togglePortal()" style="display:none">My Account</button>
 </header>
 
 <!-- ── Step indicator ────────────────────────────────────────────────────────── -->
@@ -1540,6 +1540,10 @@ const state = {
   const tomorrowStr = tomorrow.toISOString().slice(0, 10);
   setDate('fn', tomorrowStr);
   setDate('rt', tomorrowStr);
+
+  if (portalRestoreSession()) {
+    document.getElementById('portal-toggle-btn').style.display = '';
+  }
 
   if (token && /^[0-9a-f]{64}$/i.test(token)) {
     await consumeToken(token);
@@ -2431,6 +2435,7 @@ function portalStorageKey() {
 function portalSaveSession(token, registrationId) {
   portalState.token          = token;
   portalState.registrationId = registrationId;
+  document.getElementById('portal-toggle-btn').style.display = '';
   try {
     localStorage.setItem(portalStorageKey(), JSON.stringify({ token, registrationId }));
   } catch (_) {}
@@ -2506,7 +2511,9 @@ function hidePortal() {
   document.getElementById('portal-view').style.display = 'none';
   document.querySelector('main').style.display = '';
   if (state.step > 1) document.getElementById('stepper').style.display = 'flex';
-  document.getElementById('portal-toggle-btn').textContent = state.tenant?.portalLabel || 'My Account';
+  const btn = document.getElementById('portal-toggle-btn');
+  btn.textContent = state.tenant?.portalLabel || 'My Account';
+  btn.style.display = portalState.token ? '' : 'none';
 }
 
 function portalLogout() {
