@@ -1768,6 +1768,7 @@ const DEMO_ACCOUNTS = {
 };
 
 function renderDemoBox() {
+  if (state.tenant?.env !== 'development') return;
   const slug     = state.tenant?.slug || 'demo';
   const accounts = DEMO_ACCOUNTS[slug] || DEMO_ACCOUNTS.demo;
   const rows = accounts.map(a => `
