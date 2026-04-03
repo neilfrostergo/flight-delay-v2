@@ -181,7 +181,22 @@ router.get('/registration', requireCustomer, async (req, res) => {
     return res.status(404).json({ error: 'Registration not found' });
   }
 
-  const reg = regResult.rows[0];
+  let reg = regResult.rows[0];
+
+  // Backfill policy detail columns for registrations created before they existed
+  if (!reg.policy_type) {
+    const fresh = await validatePolicy(req.tenant, reg.policy_number, reg.email);
+    if (fresh.valid) {
+      const pt = fresh.policyType    || null;
+      const tv = fresh.travelers      || null;
+      const cs = fresh.coverSummary   || null;
+      await query(
+        `UPDATE registrations SET policy_type=$1, travelers=$2, cover_summary=$3 WHERE id=$4`,
+        [pt, tv ? JSON.stringify(tv) : null, cs ? JSON.stringify(cs) : null, reg.id]
+      );
+      reg = { ...reg, policy_type: pt, travelers: tv, cover_summary: cs };
+    }
+  }
 
   // Flights with their associated documents
   const flightsResult = await query(
