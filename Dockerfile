@@ -21,4 +21,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node src/db/migrate.js && node src/index.js"]
+CMD ["sh", "-c", "node src/db/migrate.js && node src/scripts/seedRefData.js && node src/index.js"]
