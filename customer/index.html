@@ -1747,25 +1747,8 @@ function selectAirport(fieldId, iata, city) {
 }
 
 // ── Demo box ──────────────────────────────────────────────────────────────────
-const DEMO_ACCOUNTS = {
-  demo: [
-    { policy: 'POL-001-ACTIVE', email: 'sarah.johnson@example.com',  desc: 'AMT · couple' },
-    { policy: 'POL-002-ACTIVE', email: 'j.williams@example.com',     desc: 'Single trip' },
-    { policy: 'POL-003-ACTIVE', email: 'emma.davies@example.com',    desc: 'AMT · family' },
-    { policy: 'POL-004-ACTIVE', email: 'm.alhassan@example.com',     desc: 'AMT · couple' },
-    { policy: 'POL-005-ACTIVE', email: 'charlotte.baker@example.com',desc: 'Return trip · couple' },
-  ],
-  ergo: [
-    { policy: 'ERGO-AMT-2026-001', email: 'thomas.muller@ergo-demo.de',   desc: 'AMT · couple' },
-    { policy: 'ERGO-RET-2026-042', email: 'sophie.klein@ergo-demo.de',    desc: 'Return trip' },
-    { policy: 'ERGO-SGL-2026-117', email: 'lukas.becker@ergo-demo.de',    desc: 'Single trip · family' },
-  ],
-  staysure: [
-    { policy: 'SS-AMT-2026-3301', email: 'patricia.hughes@staysure-demo.co.uk', desc: 'AMT · couple' },
-    { policy: 'SS-RET-2026-8820', email: 'margaret.thornton@staysure-demo.co.uk', desc: 'Return trip · couple' },
-    { policy: 'SS-SGL-2026-5504', email: 'dorothy.pearson@staysure-demo.co.uk',  desc: 'Single trip' },
-  ],
-};
+// Demo accounts are only injected by the server in development mode
+const DEMO_ACCOUNTS = window.__DEMO_ACCOUNTS__ || {};
 
 function renderDemoBox() {
   if (state.tenant?.env !== 'development') return;

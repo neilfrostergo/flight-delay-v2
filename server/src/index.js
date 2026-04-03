@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
 const path = require('path');
+const fs   = require('fs');
 
 const config = require('./config');
 const resolveTenant = require('./middleware/resolveTenant');
@@ -144,9 +145,35 @@ app.use('/', express.static(LANDING_DIR, { index: false }));
 app.get('/admin', (_req, res) => res.sendFile(path.join(ADMIN_DIR, 'index.html')));
 app.get('/admin/*path', (_req, res) => res.sendFile(path.join(ADMIN_DIR, 'index.html')));
 // Tenant requests → customer SPA; base-domain requests → generic landing page
+const CUSTOMER_HTML = fs.readFileSync(path.join(CUSTOMER_DIR, 'index.html'), 'utf8');
+const DEMO_ACCOUNTS_SCRIPT = `<script>
+window.__DEMO_ACCOUNTS__ = {
+  demo: [
+    { policy: 'POL-001-ACTIVE', email: 'sarah.johnson@example.com',  desc: 'AMT · couple' },
+    { policy: 'POL-002-ACTIVE', email: 'j.williams@example.com',     desc: 'Single trip' },
+    { policy: 'POL-003-ACTIVE', email: 'emma.davies@example.com',    desc: 'AMT · family' },
+    { policy: 'POL-004-ACTIVE', email: 'm.alhassan@example.com',     desc: 'AMT · couple' },
+    { policy: 'POL-005-ACTIVE', email: 'charlotte.baker@example.com',desc: 'Return trip · couple' },
+  ],
+  ergo: [
+    { policy: 'ERGO-AMT-2026-001', email: 'thomas.muller@ergo-demo.de',   desc: 'AMT · couple' },
+    { policy: 'ERGO-RET-2026-042', email: 'sophie.klein@ergo-demo.de',    desc: 'Return trip' },
+    { policy: 'ERGO-SGL-2026-117', email: 'lukas.becker@ergo-demo.de',    desc: 'Single trip · family' },
+  ],
+  staysure: [
+    { policy: 'SS-AMT-2026-3301', email: 'patricia.hughes@staysure-demo.co.uk', desc: 'AMT · couple' },
+    { policy: 'SS-RET-2026-8820', email: 'margaret.thornton@staysure-demo.co.uk', desc: 'Return trip · couple' },
+    { policy: 'SS-SGL-2026-5504', email: 'dorothy.pearson@staysure-demo.co.uk',  desc: 'Single trip' },
+  ],
+};
+</script>`;
+
 app.get('*path', (req, res) => {
   if (req.tenant) {
-    res.sendFile(path.join(CUSTOMER_DIR, 'index.html'));
+    if (config.nodeEnv === 'development') {
+      return res.send(CUSTOMER_HTML.replace('</head>', DEMO_ACCOUNTS_SCRIPT + '</head>'));
+    }
+    return res.sendFile(path.join(CUSTOMER_DIR, 'index.html'));
   } else {
     res.sendFile(path.join(LANDING_DIR, 'index.html'));
   }
