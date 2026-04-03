@@ -1432,22 +1432,61 @@
               <div id="portal-scan-status" style="display:none"></div>
             </div>
 
+            <!-- Search mode tabs -->
+            <div class="search-tabs" style="margin-bottom:12px">
+              <button class="search-tab active" id="portal-tab-flightnum" onclick="setPortalSearchMode('flightnum')">✈ Flight number</button>
+              <button class="search-tab"        id="portal-tab-route"     onclick="setPortalSearchMode('route')">🗺 Search by route</button>
+            </div>
+
             <div id="portal-add-error" class="alert alert-error" style="display:none;margin-bottom:10px"></div>
-            <div class="field-row" style="margin-bottom:12px">
-              <div class="field" style="margin-bottom:0">
-                <label for="portal-add-flight-num">Flight number</label>
-                <input type="text" id="portal-add-flight-num" placeholder="e.g. BA249" style="text-transform:uppercase"
-                       onkeydown="if(event.key==='Enter')portalSearchNewFlight()">
-              </div>
-              <div class="field" style="margin-bottom:0">
-                <label for="portal-add-flight-date">Departure date</label>
-                <input type="date" id="portal-add-flight-date">
+
+            <!-- Panel: flight number -->
+            <div id="portal-panel-flightnum">
+              <div class="field-row" style="margin-bottom:12px">
+                <div class="field" style="margin-bottom:0">
+                  <label for="portal-add-flight-num">Flight number</label>
+                  <input type="text" id="portal-add-flight-num" placeholder="e.g. BA249" style="text-transform:uppercase"
+                         onkeydown="if(event.key==='Enter')portalSearchNewFlight()">
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label for="portal-add-flight-date">Departure date</label>
+                  <input type="date" id="portal-add-flight-date">
+                </div>
               </div>
             </div>
+
+            <!-- Panel: route search -->
+            <div id="portal-panel-route" style="display:none">
+              <div class="field-row" style="margin-bottom:12px">
+                <div class="field airport-field" style="margin-bottom:0">
+                  <label>From</label>
+                  <input type="text" id="portal-origin-input" placeholder="City or airport…" autocomplete="off"
+                         oninput="searchAirport('portal-origin')" onfocus="searchAirport('portal-origin')">
+                  <input type="hidden" id="portal-origin-iata">
+                  <div class="airport-drop" id="portal-origin-drop"></div>
+                </div>
+                <div class="field airport-field" style="margin-bottom:0">
+                  <label>To</label>
+                  <input type="text" id="portal-destination-input" placeholder="City or airport…" autocomplete="off"
+                         oninput="searchAirport('portal-destination')" onfocus="searchAirport('portal-destination')">
+                  <input type="hidden" id="portal-destination-iata">
+                  <div class="airport-drop" id="portal-destination-drop"></div>
+                </div>
+              </div>
+              <div class="field date-field" style="margin-bottom:12px">
+                <label>Departure date</label>
+                <div class="date-input-wrap">
+                  <input type="text" id="portal-rt-date-display" placeholder="Select date" readonly
+                         onclick="openDatePicker('portal-rt-date-hidden','portal-rt-date-display')">
+                  <input type="hidden" id="portal-rt-date-hidden">
+                </div>
+              </div>
+            </div>
+
             <div id="portal-add-result" style="display:none;margin-bottom:12px"></div>
             <div class="action-row">
               <button class="btn btn-outline" onclick="togglePortalAddFlight()">Cancel</button>
-              <button class="btn btn-primary" id="portal-add-search-btn" onclick="portalSearchNewFlight()">Search</button>
+              <button class="btn btn-primary" id="portal-add-search-btn" onclick="portalDoSearch()">Search</button>
             </div>
           </div>
         </div>
@@ -2847,10 +2886,15 @@ function togglePortalAddFlight() {
   const isHidden = form.style.display === 'none';
   form.style.display = isHidden ? 'block' : 'none';
   if (isHidden) {
+    setPortalSearchMode('flightnum');
     document.getElementById('portal-add-flight-num').value = '';
     document.getElementById('portal-add-flight-date').value = '';
-    document.getElementById('portal-add-result').style.display = 'none';
-    document.getElementById('portal-add-error').style.display = 'none';
+    document.getElementById('portal-origin-input').value = '';
+    document.getElementById('portal-origin-iata').value = '';
+    document.getElementById('portal-destination-input').value = '';
+    document.getElementById('portal-destination-iata').value = '';
+    document.getElementById('portal-rt-date-hidden').value = '';
+    document.getElementById('portal-rt-date-display').value = '';
   }
 }
 
@@ -2897,6 +2941,87 @@ async function scanDocumentFile(file) {
     return data;
   } catch (_) {
     return { error: 'Network error — please try again.', flightNumbers: [], dates: [] };
+  }
+}
+
+// ── Portal: search mode toggle ───────────────────────────────────────────────
+function setPortalSearchMode(mode) {
+  document.getElementById('portal-panel-flightnum').style.display = mode === 'flightnum' ? '' : 'none';
+  document.getElementById('portal-panel-route').style.display     = mode === 'route'     ? '' : 'none';
+  document.getElementById('portal-tab-flightnum').classList.toggle('active', mode === 'flightnum');
+  document.getElementById('portal-tab-route').classList.toggle('active',     mode === 'route');
+  document.getElementById('portal-add-error').style.display  = 'none';
+  document.getElementById('portal-add-result').style.display = 'none';
+  document.getElementById('portal-add-search-btn').textContent = 'Search';
+}
+
+function portalDoSearch() {
+  const routeVisible = document.getElementById('portal-panel-route').style.display !== 'none';
+  if (routeVisible) portalSearchRoute(); else portalSearchNewFlight();
+}
+
+// ── Portal: route search ─────────────────────────────────────────────────────
+async function portalSearchRoute() {
+  const origin      = document.getElementById('portal-origin-iata').value;
+  const destination = document.getElementById('portal-destination-iata').value;
+  const date        = document.getElementById('portal-rt-date-hidden').value;
+  const errEl       = document.getElementById('portal-add-error');
+  const resEl       = document.getElementById('portal-add-result');
+  const btn         = document.getElementById('portal-add-search-btn');
+
+  errEl.style.display = 'none';
+  resEl.style.display = 'none';
+
+  if (!origin || !destination || !date) {
+    errEl.textContent = 'Please select origin, destination and a date.';
+    errEl.style.display = 'block'; return;
+  }
+  if (origin === destination) {
+    errEl.textContent = 'Origin and destination must be different.';
+    errEl.style.display = 'block'; return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Searching…';
+  try {
+    const res = await fetch(
+      `/api/flight-lookup/route?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&date=${encodeURIComponent(date)}`,
+      { headers: tenantHeader() }
+    );
+    const data = await res.json();
+    if (!data.flights?.length) {
+      errEl.textContent = 'No flights found for this route and date.';
+      errEl.style.display = 'block'; return;
+    }
+
+    const flights = data.flights;
+    resEl.innerHTML = flights.map(f => {
+      const disabled  = f.tooSoon || f.tooFar;
+      const warnHtml  = f.tooSoon
+        ? `<div style="font-size:12px;color:var(--error);margin-top:4px">Too close to departure — cannot register</div>`
+        : f.tooFar
+          ? `<div style="font-size:12px;color:var(--error);margin-top:4px">Too far in advance — cannot register yet</div>`
+          : '';
+      return `
+        <div class="flight-card" style="margin-bottom:8px">
+          <div class="flight-info">
+            <div class="flight-route-display">
+              <span>${escHtml(f.depIata || '?')}</span>
+              <span class="route-arrow">→</span>
+              <span>${escHtml(f.arrIata || '?')}</span>
+            </div>
+            <div class="flight-meta">${escHtml(f.number)} · ${escHtml(f.depTime || '—')} → ${escHtml(f.arrTime || '—')}${f.duration ? ' · ' + escHtml(f.duration) : ''}</div>
+            ${warnHtml}
+          </div>
+          <button class="btn btn-primary btn-sm" ${disabled ? 'disabled' : ''}
+            onclick="portalAddFlight(${JSON.stringify(f).replace(/"/g, '&quot;')}, '${escHtml(date)}')">Add</button>
+        </div>`;
+    }).join('');
+    resEl.style.display = 'block';
+  } catch (_) {
+    errEl.textContent = 'Network error — please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Search flights';
   }
 }
 
