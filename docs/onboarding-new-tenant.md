@@ -64,7 +64,15 @@ az containerapp hostname bind \
 - Step 1 registers the hostname with Azure so it knows to accept traffic for it
 - Step 2 requests a free managed TLS certificate from Azure. Azure verifies ownership by checking the CNAME record already in DNS (`*.delayedpaid.co.uk` → prod app). Certificate issuance takes up to 20 minutes.
 
-**DNS is already handled** — the `*.delayedpaid.co.uk` wildcard CNAME record covers all subdomains automatically. No DNS changes are needed for each new tenant.
+**DNS:** The `*.delayedpaid.co.uk` wildcard handles traffic routing, but Azure cert validation requires an explicit CNAME per hostname. Add it first:
+
+```bash
+az network dns record-set cname set-record \
+  --resource-group fdv2-prod-rg \
+  --zone-name delayedpaid.co.uk \
+  --record-set-name "SLUG" \
+  --cname fdv2-app.yellowbeach-70b56e52.uksouth.azurecontainerapps.io
+```
 
 To check when the certificate is ready:
 
@@ -96,14 +104,21 @@ The wildcard `*.uat.delayedpaid.co.uk` routes to the UAT Container App, but each
 Run the following for each new UAT tenant, replacing `SLUG`:
 
 ```bash
-# 1. Add the domain verification TXT record (get the token from the error output of step 2 if needed)
+# 1. Add explicit CNAME for the UAT subdomain
+az network dns record-set cname set-record \
+  --resource-group fdv2-prod-rg \
+  --zone-name delayedpaid.co.uk \
+  --record-set-name "SLUG.uat" \
+  --cname fdv2-uat-app.blackdesert-d8445a44.uksouth.azurecontainerapps.io
+
+# 2. Add the domain verification TXT record (get the token from the error output of step 3 if needed)
 az network dns record-set txt add-record \
   --resource-group fdv2-prod-rg \
   --zone-name delayedpaid.co.uk \
   --record-set-name "asuid.SLUG.uat" \
   --value "<TOKEN FROM AZURE>"
 
-# 2. Register the hostname (run this first to get the token if you don't have it)
+# 3. Register the hostname (run this first to get the token if you don't have it)
 az containerapp hostname add \
   --name fdv2-uat-app \
   --resource-group fdv2-uat-rg \
@@ -118,7 +133,7 @@ az containerapp hostname bind \
   --validation-method CNAME
 ```
 
-**Getting the TXT token:** Run step 2 first — if the TXT record is missing, Azure will return an error message containing the required token value. Copy it, add the TXT record (step 1), then re-run step 2.
+**Getting the TXT token:** Run step 3 first — if the TXT record is missing, Azure will return an error message containing the required token value. Copy it, add the TXT record (step 2), then re-run step 3.
 
 To check certificate status:
 
