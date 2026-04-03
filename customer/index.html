@@ -813,6 +813,19 @@
       white-space: nowrap;
     }
     .portal-nav-btn:hover { background: rgba(255,255,255,0.25); }
+    .portal-logout-pill {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.30);
+      color: rgba(255,255,255,0.80);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .portal-logout-pill:hover { background: rgba(255,255,255,0.12); color: #fff; }
 
     /* ── Customer Portal ─────────────────────────────────────────────────────── */
     #portal-view { min-height: calc(100vh - 64px); }
@@ -1087,6 +1100,7 @@
     <div class="header-brand" id="header-brand">Flight Delay Protection</div>
     <div class="header-sub" id="header-sub">Register your flight for automatic payout</div>
   </div>
+  <button class="portal-logout-pill" id="portal-logout-pill" onclick="portalHeaderLogout()" style="display:none">Log out</button>
   <button class="portal-nav-btn" id="portal-toggle-btn" onclick="togglePortal()" style="display:none">My Account</button>
 </header>
 
@@ -1543,6 +1557,7 @@ const state = {
 
   if (portalRestoreSession()) {
     document.getElementById('portal-toggle-btn').style.display = '';
+    document.getElementById('portal-logout-pill').style.display = '';
   }
 
   if (token && /^[0-9a-f]{64}$/i.test(token)) {
@@ -1923,6 +1938,7 @@ function proceedToFlights() {
   }
 
   document.getElementById('portal-toggle-btn').style.display = '';
+  document.getElementById('portal-logout-pill').style.display = '';
   showStep(2);
 }
 
@@ -2437,6 +2453,7 @@ function portalSaveSession(token, registrationId) {
   portalState.token          = token;
   portalState.registrationId = registrationId;
   document.getElementById('portal-toggle-btn').style.display = '';
+  document.getElementById('portal-logout-pill').style.display = '';
   try {
     localStorage.setItem(portalStorageKey(), JSON.stringify({ token, registrationId }));
   } catch (_) {}
@@ -2514,7 +2531,9 @@ function hidePortal() {
   if (state.step > 1) document.getElementById('stepper').style.display = 'flex';
   const btn = document.getElementById('portal-toggle-btn');
   btn.textContent = state.tenant?.portalLabel || 'My Account';
-  btn.style.display = portalState.token ? '' : 'none';
+  const show = portalState.token ? '' : 'none';
+  btn.style.display = show;
+  document.getElementById('portal-logout-pill').style.display = show;
 }
 
 function portalLogout() {
@@ -2524,7 +2543,17 @@ function portalLogout() {
   document.getElementById('portal-policy-input').value = '';
   document.getElementById('portal-email-input').value = '';
   document.getElementById('portal-login-error').style.display = 'none';
+  document.getElementById('portal-logout-pill').style.display = 'none';
   resetApp(); // wipe all personal data — clicking "← Back" now shows a clean step 1
+}
+
+// Called from the header pill — closes the portal entirely rather than showing login form
+function portalHeaderLogout() {
+  portalLogout();
+  document.getElementById('portal-view').style.display = 'none';
+  document.getElementById('portal-toggle-btn').style.display = 'none';
+  document.querySelector('main').style.display = '';
+  if (state.step > 1) document.getElementById('stepper').style.display = 'flex';
 }
 
 async function portalLogin() {
