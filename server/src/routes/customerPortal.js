@@ -181,38 +181,7 @@ router.get('/registration', requireCustomer, async (req, res) => {
     return res.status(404).json({ error: 'Registration not found' });
   }
 
-  let reg = regResult.rows[0];
-
-  // Check if stored policy detail is missing or stale (e.g. cover_benefit_name changed after registration)
-  const benefitNameKey = (req.tenant.cover_benefit_name || 'delay').toLowerCase();
-  const storedSummary  = reg.cover_summary || [];
-  const matchedBenefit = storedSummary.find(c => c.name && c.name.toLowerCase().includes(benefitNameKey));
-  const payoutStale    = !matchedBenefit || Math.round(matchedBenefit.limit * 100) !== reg.payout_pence;
-  const needsBackfill  = !reg.policy_type || !reg.cover_summary || payoutStale;
-
-  if (needsBackfill) {
-    const fresh = await validatePolicy(req.tenant, reg.policy_number, reg.email);
-    if (fresh.valid) {
-      const pt = fresh.policyType   || null;
-      const tv = fresh.travelers     || null;
-      const cs = fresh.coverSummary  || null;
-      // Also fix payout_pence if it was derived from the wrong benefit and nothing has been paid yet
-      const shouldFixPayout = reg.status !== 'paid' && fresh.payoutPence !== reg.payout_pence;
-      if (shouldFixPayout) {
-        await query(
-          `UPDATE registrations SET policy_type=$1, travelers=$2, cover_summary=$3, payout_pence=$4 WHERE id=$5`,
-          [pt, tv ? JSON.stringify(tv) : null, cs ? JSON.stringify(cs) : null, fresh.payoutPence, reg.id]
-        );
-        reg = { ...reg, policy_type: pt, travelers: tv, cover_summary: cs, payout_pence: fresh.payoutPence };
-      } else {
-        await query(
-          `UPDATE registrations SET policy_type=$1, travelers=$2, cover_summary=$3 WHERE id=$4`,
-          [pt, tv ? JSON.stringify(tv) : null, cs ? JSON.stringify(cs) : null, reg.id]
-        );
-        reg = { ...reg, policy_type: pt, travelers: tv, cover_summary: cs };
-      }
-    }
-  }
+  const reg = regResult.rows[0];
 
   // Flights with their associated documents
   const flightsResult = await query(
