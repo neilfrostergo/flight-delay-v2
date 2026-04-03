@@ -265,22 +265,16 @@ async function liveValidate(tenant, policyNumber, email) {
   const benefitName = (tenant.cover_benefit_name || 'delay').toLowerCase();
   const schemeCover = policy.scheme?.schemeCover || [];
 
-  console.log(`[policyValidator] tenant=${tenant.slug} cover_benefit_name="${tenant.cover_benefit_name}" benefitName="${benefitName}"`);
-  console.log(`[policyValidator] schemeCover names: ${schemeCover.map(c => `"${c.sectionName}" (limit:${c.limit})`).join(', ')}`);
-
   const coverItem = schemeCover.find(
     (c) => c.sectionName && c.sectionName.toLowerCase().includes(benefitName)
   );
 
   if (!coverItem) {
-    console.log(`[policyValidator] No matching benefit found for "${benefitName}"`);
     return {
       valid: false,
       errorMessage: `No "${tenant.cover_benefit_name || 'delay'}" benefit found on this policy`,
     };
   }
-
-  console.log(`[policyValidator] Matched benefit: "${coverItem.sectionName}" limit=${coverItem.limit}`);
 
   const payoutPence = Math.round((coverItem.limit || 0) * 100);
   if (payoutPence <= 0) {
