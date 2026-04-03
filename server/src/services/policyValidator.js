@@ -264,6 +264,7 @@ async function liveValidate(tenant, policyNumber, email) {
   // Find the flight delay cover benefit in scheme.schemeCover
   const benefitName = (tenant.cover_benefit_name || 'delay').toLowerCase();
   const schemeCover = policy.scheme?.schemeCover || [];
+
   const coverItem = schemeCover.find(
     (c) => c.sectionName && c.sectionName.toLowerCase().includes(benefitName)
   );

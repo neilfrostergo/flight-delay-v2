@@ -7,6 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
+    /* ── Prevent brand-colour flash on load ─────────────────────────────────── */
+    body { visibility: hidden; }
+    body.branding-ready { visibility: visible; animation: fadeIn 0.1s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
     /* ── Design tokens ───────────────────────────────────────────────────────── */
     :root {
       --brand:        #8e0038;
@@ -1388,7 +1393,8 @@
         <div id="portal-login-error" class="alert alert-error" style="display:none;margin-bottom:16px"></div>
         <div class="field">
           <label for="portal-policy-input">Policy number</label>
-          <input id="portal-policy-input" type="text" placeholder="e.g. POL-001-ACTIVE" autocomplete="off">
+          <input id="portal-policy-input" type="text" placeholder="e.g. POL-001-ACTIVE" autocomplete="off"
+                 onkeydown="if(event.key==='Enter')portalLogin()">
         </div>
         <div class="field">
           <label for="portal-email-input">Email address on your policy</label>
@@ -1485,6 +1491,9 @@ const state = {
     }
   } catch (_) {}
 
+  // Always reveal the page — even if tenant-config failed
+  document.body.classList.add('branding-ready');
+
   renderDemoBox();
 
   // Default dates to tomorrow (flights need 24h notice)
@@ -1519,6 +1528,7 @@ function applyBranding(tenant) {
     document.documentElement.style.setProperty('--brand-dark', darkenHex(tenant.primaryColour, 20));
     document.documentElement.style.setProperty('--brand-light', hexWithAlpha(tenant.primaryColour, 0.08));
   }
+  document.body.classList.add('branding-ready');
   if (tenant.logoUrl) {
     const img = document.createElement('img');
     img.src = tenant.logoUrl;
@@ -1737,27 +1747,11 @@ function selectAirport(fieldId, iata, city) {
 }
 
 // ── Demo box ──────────────────────────────────────────────────────────────────
-const DEMO_ACCOUNTS = {
-  demo: [
-    { policy: 'POL-001-ACTIVE', email: 'sarah.johnson@example.com',  desc: 'AMT · couple' },
-    { policy: 'POL-002-ACTIVE', email: 'j.williams@example.com',     desc: 'Single trip' },
-    { policy: 'POL-003-ACTIVE', email: 'emma.davies@example.com',    desc: 'AMT · family' },
-    { policy: 'POL-004-ACTIVE', email: 'm.alhassan@example.com',     desc: 'AMT · couple' },
-    { policy: 'POL-005-ACTIVE', email: 'charlotte.baker@example.com',desc: 'Return trip · couple' },
-  ],
-  ergo: [
-    { policy: 'ERGO-AMT-2026-001', email: 'thomas.muller@ergo-demo.de',   desc: 'AMT · couple' },
-    { policy: 'ERGO-RET-2026-042', email: 'sophie.klein@ergo-demo.de',    desc: 'Return trip' },
-    { policy: 'ERGO-SGL-2026-117', email: 'lukas.becker@ergo-demo.de',    desc: 'Single trip · family' },
-  ],
-  staysure: [
-    { policy: 'SS-AMT-2026-3301', email: 'patricia.hughes@staysure-demo.co.uk', desc: 'AMT · couple' },
-    { policy: 'SS-RET-2026-8820', email: 'margaret.thornton@staysure-demo.co.uk', desc: 'Return trip · couple' },
-    { policy: 'SS-SGL-2026-5504', email: 'dorothy.pearson@staysure-demo.co.uk',  desc: 'Single trip' },
-  ],
-};
+// Demo accounts are only injected by the server in development mode
+const DEMO_ACCOUNTS = window.__DEMO_ACCOUNTS__ || {};
 
 function renderDemoBox() {
+  if (state.tenant?.env !== 'development') return;
   const slug     = state.tenant?.slug || 'demo';
   const accounts = DEMO_ACCOUNTS[slug] || DEMO_ACCOUNTS.demo;
   const rows = accounts.map(a => `
@@ -2627,9 +2621,9 @@ function renderPortalDash(reg) {
       </div>` : ''}
       <div class="portal-summary-row">
         <span class="portal-summary-label">Delay payout</span>
-        <span class="portal-summary-value">
+        <span class="portal-summary-value" style="text-align:right">
           £${(reg.payout_pence / 100).toFixed(2)} per person
-          <span class="portal-payout-context">payable after a qualifying 12-hour delay</span>
+          <span class="portal-payout-context" style="display:block">payable after a qualifying 12-hour delay</span>
         </span>
       </div>
       ${travelersHtml ? `
@@ -3022,7 +3016,7 @@ async function portalDeleteFlight(flightId) {
       You've added your outbound flight. Would you like to add your return flight too? Both legs are covered under your policy.
     </div>
     <button class="btn btn-primary btn-full" onclick="closeReturnModal(false)" style="margin-bottom:10px">Yes, add my return flight</button>
-    <button class="btn btn-outline btn-full" onclick="closeReturnModal(true)">No thanks, continue to payment</button>
+    <button class="btn btn-outline btn-full" onclick="closeReturnModal(true)">No thanks, continue</button>
   </div>
 </div>
 </body>
