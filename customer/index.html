@@ -2337,7 +2337,8 @@ async function uploadFile(file) {
 }
 
 function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -2542,9 +2543,10 @@ async function showPortalDash() {
       return;
     }
     renderPortalDash(data);
-  } catch (_) {
+  } catch (err) {
+    console.error('[portal] showPortalDash error:', err);
     document.getElementById('portal-flights-list').innerHTML =
-      '<div class="alert alert-error">Network error — please try again.</div>';
+      '<div class="alert alert-error">Error loading your flights — please try refreshing.</div>';
   }
 }
 
