@@ -113,8 +113,8 @@ router.get('/route', async (req, res) => {
   }
 
   const params = new URLSearchParams({
-    DepartureStation:  dep,
-    ArrivalStation:    arr,
+    DepartureAirport:  dep,
+    ArrivalAirport:    arr,
     DepartureDateTime: date,
     CodeType:          'IATA',
     version:           'v2',
