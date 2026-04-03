@@ -24,7 +24,28 @@
 require('dotenv').config();
 
 const snowflake = require('snowflake-sdk');
-const { query, withTransaction } = require('../db/connection');
+const { Pool } = require('pg');
+
+// Minimal DB client — avoids importing config.js which requires JWT_SECRET etc.
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+async function query(sql, params) {
+  const client = await pool.connect();
+  try { return await client.query(sql, params); }
+  finally { client.release(); }
+}
+async function withTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await fn(client);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 const sf = {
   account:   process.env.SNOWFLAKE_ACCOUNT,
@@ -215,10 +236,12 @@ async function main() {
     query('SELECT COUNT(*) FROM ref_airports'),
   ]);
   console.log(`\n[sync] Complete — ${cCount.rows[0].count} carriers, ${aCount.rows[0].count} airports in DB`);
+  await pool.end();
   process.exit(0);
 }
 
-main().catch(err => {
+main().catch(async err => {
   console.error('[sync] Fatal error:', err.message, err.cause?.message || '', err.stack?.split('\n')[1] || '');
+  await pool.end().catch(() => {});
   process.exit(1);
 });

@@ -1,0 +1,41 @@
+name: Sync Reference Data (Snowflake → PostgreSQL)
+
+on:
+  schedule:
+    - cron: '0 3 2 * *'   # 2nd of every month at 03:00 UTC
+  workflow_dispatch:        # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  sync-prod:
+    name: Trigger sync job → Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start Container Apps sync job (prod)
+        run: |
+          az containerapp job start \
+            --name fdv2-sync-job \
+            --resource-group fdv2-prod-rg
+
+  sync-uat:
+    name: Trigger sync job → UAT
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start Container Apps sync job (UAT)
+        run: |
+          az containerapp job start \
+            --name fdv2-sync-job \
+            --resource-group fdv2-uat-rg
