@@ -32,10 +32,10 @@ router.get('/', async (req, res) => {
     );
     return res.json(results.rows.map(r => ({
       iata:         r.iata_code,
-      name:         r.airport_name,
-      city:         r.city,
-      country:      r.country_name,
-      country_code: r.country_code,
+      name:         r.airport_name  || r.iata_code,
+      city:         r.city          || r.airport_name || r.iata_code,
+      country:      r.country_name  || '',
+      country_code: r.country_code  || '',
       timezone:     r.timezone,
       lat:          r.latitude  ? parseFloat(r.latitude)  : null,
       lng:          r.longitude ? parseFloat(r.longitude) : null,
