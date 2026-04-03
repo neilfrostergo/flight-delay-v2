@@ -2628,9 +2628,9 @@ function renderPortalDash(reg) {
       </div>` : ''}
       <div class="portal-summary-row">
         <span class="portal-summary-label">Delay payout</span>
-        <span class="portal-summary-value">
+        <span class="portal-summary-value" style="text-align:right">
           £${(reg.payout_pence / 100).toFixed(2)} per person
-          <span class="portal-payout-context">payable after a qualifying 12-hour delay</span>
+          <span class="portal-payout-context" style="display:block">payable after a qualifying 12-hour delay</span>
         </span>
       </div>
       ${travelersHtml ? `
