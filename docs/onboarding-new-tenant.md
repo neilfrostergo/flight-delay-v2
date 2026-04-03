@@ -64,14 +64,22 @@ az containerapp hostname bind \
 - Step 1 registers the hostname with Azure so it knows to accept traffic for it
 - Step 2 requests a free managed TLS certificate from Azure. Azure verifies ownership by checking the CNAME record already in DNS (`*.delayedpaid.co.uk` → prod app). Certificate issuance takes up to 20 minutes.
 
-**DNS:** The `*.delayedpaid.co.uk` wildcard handles traffic routing, but Azure cert validation requires an explicit CNAME per hostname. Add it first:
+**DNS:** The `*.delayedpaid.co.uk` wildcard handles traffic routing, but Azure cert validation requires an explicit CNAME and a TXT verification record per hostname. Add both before running the bind:
 
 ```bash
+# Explicit CNAME (required for cert validation)
 az network dns record-set cname set-record \
   --resource-group fdv2-prod-rg \
   --zone-name delayedpaid.co.uk \
   --record-set-name "SLUG" \
   --cname fdv2-app.yellowbeach-70b56e52.uksouth.azurecontainerapps.io
+
+# TXT verification record (same token for all prod subdomains)
+az network dns record-set txt add-record \
+  --resource-group fdv2-prod-rg \
+  --zone-name delayedpaid.co.uk \
+  --record-set-name "asuid.SLUG" \
+  --value "C4AD509475080D11B511DF722E4AACCCDEE0F592E29F4085C74F6533FE074052"
 ```
 
 To check when the certificate is ready:
