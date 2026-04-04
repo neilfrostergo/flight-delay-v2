@@ -542,6 +542,21 @@
     .flight-meta-item:last-child  { justify-content: flex-end; }
 
     .route-arrow { display: none; }
+    .swap-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 28px; height: 28px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+      align-self: center;
+      margin-top: 18px; /* align with inputs, below label */
+    }
+    .swap-btn:hover { background: var(--brand-light); color: var(--brand); border-color: var(--brand); }
 
     /* ── Policy type badge ───────────────────────────────────────────────────── */
     .policy-type-badge {
@@ -1225,7 +1240,7 @@
 
       <!-- Panel: route search -->
       <div id="panel-route" style="display:none">
-        <div class="field-row" style="margin-bottom:12px;">
+        <div class="field-row" style="margin-bottom:12px;align-items:flex-start">
           <div class="field airport-field" style="margin-bottom:0">
             <label>From</label>
             <input type="text" id="origin-input" placeholder="City or airport…" autocomplete="off"
@@ -1233,6 +1248,7 @@
             <input type="hidden" id="origin-iata">
             <div class="airport-drop" id="origin-drop"></div>
           </div>
+          <button class="swap-btn" onclick="swapRouteAirports('origin','destination')" title="Swap airports">⇄</button>
           <div class="field airport-field" style="margin-bottom:0">
             <label>To</label>
             <input type="text" id="destination-input" placeholder="City or airport…" autocomplete="off"
@@ -1473,7 +1489,7 @@
 
             <!-- Panel: route search -->
             <div id="portal-panel-route" style="display:none">
-              <div class="field-row" style="margin-bottom:12px">
+              <div class="field-row" style="margin-bottom:12px;align-items:flex-start">
                 <div class="field airport-field" style="margin-bottom:0">
                   <label>From</label>
                   <input type="text" id="portal-origin-input" placeholder="City or airport…" autocomplete="off"
@@ -1481,6 +1497,7 @@
                   <input type="hidden" id="portal-origin-iata">
                   <div class="airport-drop" id="portal-origin-drop"></div>
                 </div>
+                <button class="swap-btn" onclick="swapRouteAirports('portal-origin','portal-destination')" title="Swap airports">⇄</button>
                 <div class="field airport-field" style="margin-bottom:0">
                   <label>To</label>
                   <input type="text" id="portal-destination-input" placeholder="City or airport…" autocomplete="off"
@@ -1764,6 +1781,20 @@ function setDate(prefix, s) {
 }
 
 // ── Airport autocomplete ──────────────────────────────────────────────────────
+function swapRouteAirports(originPrefix, destPrefix) {
+  const originInput = document.getElementById(originPrefix + '-input');
+  const originIata  = document.getElementById(originPrefix + '-iata');
+  const destInput   = document.getElementById(destPrefix   + '-input');
+  const destIata    = document.getElementById(destPrefix   + '-iata');
+
+  const tmpText = originInput.value;
+  const tmpIata = originIata.value;
+  originInput.value = destInput.value;
+  originIata.value  = destIata.value;
+  destInput.value   = tmpText;
+  destIata.value    = tmpIata;
+}
+
 let _apTimer = null;
 
 function searchAirport(fieldId) {
