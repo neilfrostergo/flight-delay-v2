@@ -207,6 +207,21 @@
     .flex { display: flex; }
     .items-center { align-items: center; }
     .justify-between { justify-content: space-between; }
+
+    /* ── Colour picker + hex field ── */
+    .colour-field { display: flex; align-items: center; gap: 8px; }
+    .colour-swatch {
+      width: 38px; height: 38px;
+      padding: 2px; border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer;
+      flex-shrink: 0;
+    }
+    .colour-hex {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      width: 90px;
+      text-transform: uppercase;
+    }
   </style>
 </head>
 <body>
@@ -617,7 +632,12 @@
           <div class="form-row">
             <div class="form-group">
               <label>Primary Colour</label>
-              <input id="st-colour" type="color" style="height:38px;padding:2px 4px;" />
+              <div class="colour-field">
+                <input id="st-colour" type="color" class="colour-swatch" />
+                <input id="st-colour-hex" type="text" class="colour-hex" maxlength="7" placeholder="#000000"
+                       oninput="syncColourFromHex('st-colour','st-colour-hex')"
+                       onblur="normaliseColourHex('st-colour','st-colour-hex')" />
+              </div>
             </div>
             <div class="form-group">
               <label>Terms URL</label>
@@ -730,7 +750,15 @@
     <div class="form-group"><label>Subdomain *</label><input id="tm-subdomain" placeholder="ergo.platform.co.uk" /></div>
     <div class="form-row">
       <div class="form-group"><label>Support Email</label><input id="tm-support-email" type="email" /></div>
-      <div class="form-group"><label>Primary Colour</label><input id="tm-colour" type="color" style="height:38px;padding:2px 4px;" /></div>
+      <div class="form-group">
+        <label>Primary Colour</label>
+        <div class="colour-field">
+          <input id="tm-colour" type="color" class="colour-swatch" />
+          <input id="tm-colour-hex" type="text" class="colour-hex" maxlength="7" placeholder="#000000"
+                 oninput="syncColourFromHex('tm-colour','tm-colour-hex')"
+                 onblur="normaliseColourHex('tm-colour','tm-colour-hex')" />
+        </div>
+      </div>
     </div>
     <div class="form-group">
       <label>Logo URL</label>
@@ -980,6 +1008,39 @@
 
 <script>
 'use strict';
+
+// ── Colour picker helpers ─────────────────────────────────────────────────────
+
+function setColourField(swatchId, hexId, value) {
+  const hex = /^#[0-9a-f]{6}$/i.test(value) ? value : '#2563eb';
+  document.getElementById(swatchId).value = hex;
+  document.getElementById(hexId).value    = hex.toUpperCase();
+  // Keep swatch in sync when user types in the hex field
+  document.getElementById(swatchId).oninput = () => {
+    document.getElementById(hexId).value = document.getElementById(swatchId).value.toUpperCase();
+  };
+}
+
+function syncColourFromHex(swatchId, hexId) {
+  const raw = document.getElementById(hexId).value.trim();
+  const hex = raw.startsWith('#') ? raw : '#' + raw;
+  if (/^#[0-9a-f]{6}$/i.test(hex)) {
+    document.getElementById(swatchId).value = hex;
+  }
+}
+
+function normaliseColourHex(swatchId, hexId) {
+  const el  = document.getElementById(hexId);
+  const raw = el.value.trim();
+  const hex = raw.startsWith('#') ? raw : '#' + raw;
+  if (/^#[0-9a-f]{6}$/i.test(hex)) {
+    el.value = hex.toUpperCase();
+    document.getElementById(swatchId).value = hex;
+  } else {
+    // Revert to whatever the swatch currently holds
+    el.value = document.getElementById(swatchId).value.toUpperCase();
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -1258,7 +1319,7 @@ async function openTenantModal(tenant) {
   document.getElementById('tm-slug').value = tenant?.slug || '';
   document.getElementById('tm-subdomain').value = tenant?.subdomain || '';
   document.getElementById('tm-support-email').value = tenant?.support_email || '';
-  document.getElementById('tm-colour').value = tenant?.primary_colour || '#2563eb';
+  setColourField('tm-colour', 'tm-colour-hex', tenant?.primary_colour || '#2563eb');
   document.getElementById('tm-logo-url').value = tenant?.logo_url || '';
   document.getElementById('tm-terms-url').value = tenant?.terms_url || '';
   document.getElementById('tm-register-claim-url').value = tenant?.register_claim_url || '';
@@ -2022,7 +2083,7 @@ function populateSettings(t) {
   document.getElementById('st-name').value = t.name || '';
   document.getElementById('st-support-email').value = t.support_email || '';
   document.getElementById('st-logo-url').value = t.logo_url || '';
-  document.getElementById('st-colour').value = t.primary_colour || '#2563eb';
+  setColourField('st-colour', 'st-colour-hex', t.primary_colour || '#2563eb');
   document.getElementById('st-terms-url').value = t.terms_url || '';
   document.getElementById('st-claim-url').value = t.claim_url || '';
   document.getElementById('st-register-claim-url').value = t.register_claim_url || '';
