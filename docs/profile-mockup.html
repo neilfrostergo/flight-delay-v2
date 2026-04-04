@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Profile — Delayed? Paid.</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --brand:        #EE0138;
+    --brand-dark:   #c40030;
+    --brand-light:  #fff0f3;
+    --text:         #1a1a2e;
+    --muted:        #6b7280;
+    --border:       #e5e7eb;
+    --bg:           #f9fafb;
+    --card:         #ffffff;
+    --radius:       14px;
+    --radius-sm:    8px;
+    --green:        #059669;
+    --green-bg:     #ecfdf5;
+    --amber:        #d97706;
+    --amber-bg:     #fffbeb;
+    --blue:         #2563eb;
+    --blue-bg:      #eff6ff;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--brand);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .header-brand { color: #fff; font-weight: 800; font-size: 17px; letter-spacing: -0.3px; }
+  .header-back {
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    cursor: pointer;
+  }
+  .header-back:hover { color: #fff; }
+
+  /* ── Layout ── */
+  .page { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  /* ── Hero card ── */
+  .hero-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 28px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand) 0%, #ff6b8a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .hero-name { font-size: 22px; font-weight: 800; margin-bottom: 2px; }
+  .hero-email { color: var(--muted); font-size: 13px; }
+  .hero-meta { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .pill-green  { background: var(--green-bg);  color: var(--green); }
+  .pill-amber  { background: var(--amber-bg);  color: var(--amber); }
+  .pill-blue   { background: var(--blue-bg);   color: var(--blue);  }
+  .pill-brand  { background: var(--brand-light); color: var(--brand); }
+  .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .hero-actions { display: flex; gap: 8px; flex-direction: column; }
+  .btn {
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    white-space: nowrap;
+  }
+  .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--brand); color: var(--brand); }
+
+  /* ── Section grid ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+
+  @media (max-width: 680px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .hero-card { grid-template-columns: auto 1fr; }
+    .hero-actions { display: none; }
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 20px;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title-icon { font-size: 14px; }
+
+  /* ── Stat row ── */
+  .stat-row { display: flex; flex-direction: column; gap: 12px; }
+  .stat-item { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .stat-label { color: var(--muted); font-size: 13px; }
+  .stat-value { font-weight: 600; font-size: 14px; text-align: right; }
+  .stat-mono  { font-family: 'Courier New', monospace; color: var(--brand); font-weight: 700; font-size: 15px; }
+  .stat-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+  /* ── Big number ── */
+  .big-number {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--brand);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .big-label { font-size: 12px; color: var(--muted); }
+
+  /* ── Cover table ── */
+  .cover-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .cover-table th {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    text-align: left;
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cover-table th:not(:first-child) { text-align: right; }
+  .cover-table td {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: top;
+  }
+  .cover-table tr:last-child td { border-bottom: none; }
+  .cover-table td:not(:first-child) { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .benefit-name { font-weight: 600; }
+  .benefit-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .highlight-row td { background: var(--brand-light); }
+  .highlight-row td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); padding-left: 8px; }
+  .highlight-row td:last-child  { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding-right: 8px; }
+  .highlight-row td { color: var(--brand); }
+  .highlight-row td .benefit-desc { color: rgba(238,1,56,0.6); }
+
+  /* ── Travelers ── */
+  .traveler-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .traveler-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .traveler-avatar {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .traveler-chip.lead { background: var(--brand-light); border-color: rgba(238,1,56,0.2); }
+  .traveler-chip.lead .traveler-avatar { background: var(--brand); }
+
+  /* ── Flight list ── */
+  .flight-list { display: flex; flex-direction: column; gap: 10px; }
+  .flight-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+  }
+  .flight-badge {
+    background: var(--text);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-family: 'Courier New', monospace;
+    flex-shrink: 0;
+  }
+  .flight-route {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 15px;
+    flex: 1;
+  }
+  .flight-arrow { color: var(--muted); font-size: 12px; }
+  .flight-date { font-size: 12px; color: var(--muted); }
+  .flight-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 12px;
+    flex-shrink: 0;
+  }
+  .status-active   { background: var(--green-bg);  color: var(--green); }
+  .status-paid     { background: #ede9fe;            color: #6d28d9; }
+  .status-cancelled{ background: #f3f4f6;            color: var(--muted); }
+
+  /* ── Timeline ── */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .timeline-item { display: flex; gap: 14px; padding-bottom: 16px; position: relative; }
+  .timeline-item:last-child { padding-bottom: 0; }
+  .timeline-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 24px;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    z-index: 1;
+    margin-top: 1px;
+  }
+  .dot-green  { background: var(--green-bg);  color: var(--green);  border: 2px solid var(--green);  }
+  .dot-brand  { background: var(--brand-light); color: var(--brand); border: 2px solid var(--brand); }
+  .dot-gray   { background: #f3f4f6;           color: var(--muted);  border: 2px solid var(--border); }
+  .dot-amber  { background: var(--amber-bg);   color: var(--amber);  border: 2px solid var(--amber); }
+  .timeline-content { flex: 1; }
+  .timeline-title { font-weight: 600; font-size: 13px; }
+  .timeline-sub { color: var(--muted); font-size: 12px; margin-top: 1px; }
+
+  /* ── Cover period bar ── */
+  .period-bar-wrap { margin-top: 10px; }
+  .period-bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .period-bar-bg { background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
+  .period-bar-fill { height: 100%; background: var(--brand); border-radius: 4px; transition: width 0.4s; }
+  .period-bar-today { margin-top: 4px; font-size: 11px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-brand">ERGO Travel Insurance</div>
+  <a class="header-back" href="#">← My flights</a>
+</header>
+
+<main class="page">
+
+  <!-- ── Hero ── -->
+  <div class="hero-card">
+    <div class="avatar">SJ</div>
+    <div>
+      <div class="hero-name">Sarah Johnson</div>
+      <div class="hero-email">sarah.johnson@example.com</div>
+      <div class="hero-meta">
+        <span class="status-pill pill-green"><span class="pill-dot"></span>Policy active</span>
+        <span class="status-pill pill-blue">Annual Multi-Trip</span>
+        <span class="status-pill pill-brand">£250 delay payout</span>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <button class="btn btn-outline">✉ Send email</button>
+      <button class="btn btn-outline">➕ Add flight</button>
+    </div>
+  </div>
+
+  <!-- ── Top stats ── -->
+  <div class="grid-3" style="margin-bottom:20px">
+    <div class="card" style="text-align:center;padding:24px">
+      <div class="big-number">3</div>
+      <div class="big-label">Flights registered</div>
+    </div>
+    <div class="card" style="text-align:center;padding:24px">
+      <div class="big-number" style="color:var(--green)">1</div>
+      <div class="big-label">Payout processed</div>
+    </div>
+    <div class="card" style="text-align:center;padding:24px">
+      <div class="big-number">271</div>
+      <div class="big-label">Days cover remaining</div>
+    </div>
+  </div>
+
+  <!-- ── Policy + Cover period ── -->
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card-title"><span class="card-title-icon">📋</span> Policy details</div>
+      <div class="stat-row">
+        <div class="stat-item">
+          <span class="stat-label">Policy number</span>
+          <span class="stat-mono">POL-001-ACTIVE</span>
+        </div>
+        <hr class="stat-divider">
+        <div class="stat-item">
+          <span class="stat-label">Policy type</span>
+          <span class="stat-value"><span class="status-pill pill-blue">Annual Multi-Trip</span></span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Cover start</span>
+          <span class="stat-value">1 Jan 2026</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Cover end</span>
+          <span class="stat-value">31 Dec 2026</span>
+        </div>
+        <hr class="stat-divider">
+        <div class="stat-item">
+          <span class="stat-label">Delay payout</span>
+          <span class="stat-value" style="color:var(--brand);font-size:16px;font-weight:800">£250 <span style="font-size:12px;font-weight:400;color:var(--muted)">per person</span></span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Delay threshold</span>
+          <span class="stat-value">3 hours</span>
+        </div>
+        <hr class="stat-divider">
+        <div class="stat-item">
+          <span class="stat-label">Registered</span>
+          <span class="stat-value">3 Apr 2026</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="card-title-icon">📅</span> Cover period</div>
+      <div class="period-bar-wrap">
+        <div class="period-bar-labels">
+          <span>1 Jan 2026</span>
+          <span>31 Dec 2026</span>
+        </div>
+        <div class="period-bar-bg">
+          <div class="period-bar-fill" style="width:26%"></div>
+        </div>
+        <div class="period-bar-today">▲ Today — 271 days remaining (26% elapsed)</div>
+      </div>
+
+      <div style="margin-top:20px">
+        <div class="card-title"><span class="card-title-icon">👥</span> Travelers</div>
+        <div class="traveler-list">
+          <div class="traveler-chip lead">
+            <div class="traveler-avatar">SJ</div>
+            Sarah Johnson
+            <span class="status-pill pill-brand" style="font-size:10px;padding:1px 6px">lead</span>
+          </div>
+          <div class="traveler-chip">
+            <div class="traveler-avatar" style="background:#6b7280">TJ</div>
+            Tom Johnson
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Flights ── -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title" style="justify-content:space-between">
+      <span><span class="card-title-icon">✈️</span> Registered flights</span>
+      <button class="btn btn-outline" style="font-size:12px;padding:4px 10px">+ Add flight</button>
+    </div>
+    <div class="flight-list">
+      <div class="flight-row">
+        <span class="flight-badge">BA249</span>
+        <div class="flight-route">
+          <span>LHR</span><span class="flight-arrow">→</span><span>JFK</span>
+        </div>
+        <span class="flight-date">15 Apr 2026 · 09:30</span>
+        <span class="flight-status status-active">Active</span>
+      </div>
+      <div class="flight-row">
+        <span class="flight-badge">BA178</span>
+        <div class="flight-route">
+          <span>JFK</span><span class="flight-arrow">→</span><span>LHR</span>
+        </div>
+        <span class="flight-date">22 Apr 2026 · 19:15</span>
+        <span class="flight-status status-active">Active</span>
+      </div>
+      <div class="flight-row" style="opacity:0.7">
+        <span class="flight-badge" style="background:#6b7280">EZY8405</span>
+        <div class="flight-route">
+          <span>LGW</span><span class="flight-arrow">→</span><span>BCN</span>
+        </div>
+        <span class="flight-date">2 Mar 2026 · 07:05</span>
+        <span class="flight-status status-paid">Paid £250</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Cover summary + Activity ── -->
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card-title"><span class="card-title-icon">🛡️</span> Cover summary</div>
+      <table class="cover-table">
+        <thead>
+          <tr>
+            <th>Benefit</th>
+            <th>Limit</th>
+            <th>Excess</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="highlight-row">
+            <td>
+              <div class="benefit-name">Flight Delay</div>
+              <div class="benefit-desc">Automatic payout after 3-hour delay</div>
+            </td>
+            <td>£250</td>
+            <td>Nil</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="benefit-name">Travel Delay</div>
+              <div class="benefit-desc">Payable after a qualifying 12-hour delay</div>
+            </td>
+            <td>£280</td>
+            <td>Nil</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="benefit-name">Cancellation</div>
+              <div class="benefit-desc">Trip cancellation for covered reasons</div>
+            </td>
+            <td>£3,000</td>
+            <td>£100</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="benefit-name">Emergency Medical</div>
+              <div class="benefit-desc">Medical and repatriation expenses abroad</div>
+            </td>
+            <td>£10M</td>
+            <td>£100</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="benefit-name">Missed Departure</div>
+              <div class="benefit-desc">Additional travel costs</div>
+            </td>
+            <td>£1,000</td>
+            <td>Nil</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="benefit-name">Personal Possessions</div>
+              <div class="benefit-desc">Loss, theft or damage to belongings</div>
+            </td>
+            <td>£1,500</td>
+            <td>£50</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="benefit-name">Personal Liability</div>
+              <div class="benefit-desc">Legal liability to third parties</div>
+            </td>
+            <td>£2M</td>
+            <td>Nil</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="card-title-icon">🕐</span> Activity</div>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-dot dot-green">£</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Payout processed — £250</div>
+            <div class="timeline-sub">EZY8405 LGW→BCN · 3hr 12min delay · 2 Mar 2026</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot dot-brand">✈</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Flight registered — BA178</div>
+            <div class="timeline-sub">JFK → LHR · 22 Apr 2026 · 3 Apr 2026</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot dot-brand">✈</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Flight registered — BA249</div>
+            <div class="timeline-sub">LHR → JFK · 15 Apr 2026 · 3 Apr 2026</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot dot-brand">✈</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Flight registered — EZY8405</div>
+            <div class="timeline-sub">LGW → BCN · 2 Mar 2026 · 28 Feb 2026</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot dot-gray">📄</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Booking confirmation uploaded</div>
+            <div class="timeline-sub">EZY8405 · Document matched · 28 Feb 2026</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot dot-gray">👤</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Account registered</div>
+            <div class="timeline-sub">28 Feb 2026 · via token link</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+</body>
+</html>
