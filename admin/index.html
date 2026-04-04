@@ -512,7 +512,16 @@
       <div class="page" id="page-tokens">
         <div class="page-header">
           <h2>Pre-validation Tokens</h2>
-          <button class="btn btn-primary btn-sm" onclick="openTokenModal()">+ Generate Token</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('csv-import-input').click()">⬆ Import CSV</button>
+            <button class="btn btn-primary btn-sm" onclick="openTokenModal()">+ Generate Token</button>
+          </div>
+          <input type="file" id="csv-import-input" accept=".csv,text/csv" style="display:none" onchange="importTokenCsv(this)">
+        </div>
+        <div id="csv-import-banner" style="display:none;margin-bottom:12px"></div>
+        <div style="margin-bottom:12px;font-size:13px;color:var(--muted)">
+          Import CSV format: <code>policy_number,email,first_name</code> — first_name is optional.
+          A download with token URLs is returned automatically.
         </div>
         <div class="filters">
           <div class="form-group"><label>Show</label>
@@ -1883,6 +1892,48 @@ async function revokeToken(id) {
   if (!confirm('Revoke this token?')) return;
   await DELETE(`/api/admin/tokens/${id}`);
   loadTokens(tokPage);
+}
+
+async function importTokenCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = ''; // reset so same file can be re-selected
+
+  const banner = document.getElementById('csv-import-banner');
+  banner.innerHTML = '<div class="alert" style="background:#f0f4ff;border:1px solid #c7d2fe;color:#3730a3">Importing…</div>';
+  banner.style.display = '';
+
+  const formData = new FormData();
+  formData.append('csv', file);
+
+  try {
+    const headers = {};
+    if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+    if (IS_DEV) headers['X-Tenant-Slug'] = 'ergo';
+
+    const res = await fetch('/api/admin/tokens/import', { method: 'POST', headers, body: formData });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Import failed' }));
+      banner.innerHTML = `<div class="alert alert-error">${esc(err.error || 'Import failed')}</div>`;
+      return;
+    }
+
+    // Server returns a CSV — trigger download
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `tokens-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Count rows from content-disposition or just show success
+    banner.innerHTML = '<div class="alert alert-success">Import complete — token URLs downloaded as CSV.</div>';
+    loadTokens(1);
+  } catch (err) {
+    banner.innerHTML = `<div class="alert alert-error">Network error — ${esc(err.message)}</div>`;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════

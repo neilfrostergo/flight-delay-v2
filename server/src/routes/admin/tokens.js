@@ -2,12 +2,14 @@
 
 const express = require('express');
 const crypto  = require('crypto');
+const multer  = require('multer');
 const Joi     = require('joi');
 const { query } = require('../../db/connection');
 const { adminTenantScope } = require('../../middleware/requireAdmin');
 const { sendSingleTripOutreach, sendReturnTripOutreach, sendAnnualMultiTripOutreach } = require('../../services/notificationService');
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 function generateToken() {
   return crypto.randomBytes(32).toString('hex'); // 64-char hex
@@ -141,6 +143,120 @@ router.post('/send-outreach', async (req, res) => {
   else await sendAnnualMultiTripOutreach(args);
 
   return res.json({ ok: true });
+});
+
+// POST /api/admin/tokens/import — bulk generate tokens from CSV upload
+// Input CSV columns: policy_number, email (required); first_name (optional)
+// Returns a CSV with the same rows plus token_url, expires_at, status columns
+router.post('/import', upload.single('csv'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No CSV file uploaded' });
+
+  const scope = adminTenantScope(req);
+  let tenantId = scope;
+  if (scope === null) {
+    const tid = parseInt(req.body.tenant_id, 10);
+    if (!tid) return res.status(400).json({ error: 'tenant_id required for superadmin import' });
+    tenantId = tid;
+  }
+
+  const tenantResult = await query(
+    'SELECT token_ttl_days, subdomain FROM tenants WHERE id = $1',
+    [tenantId]
+  );
+  if (tenantResult.rows.length === 0) return res.status(404).json({ error: 'Tenant not found' });
+  const tenant = tenantResult.rows[0];
+
+  // ── Parse CSV ──────────────────────────────────────────────────────────────
+  const text  = req.file.buffer.toString('utf8');
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return res.status(400).json({ error: 'CSV must have a header row and at least one data row' });
+
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
+  const policyIdx = headers.indexOf('policy_number');
+  const emailIdx  = headers.indexOf('email');
+  const nameIdx   = headers.indexOf('first_name');
+
+  if (policyIdx === -1 || emailIdx === -1) {
+    return res.status(400).json({ error: 'CSV must contain policy_number and email columns' });
+  }
+
+  function parseRow(line) {
+    // Simple CSV parse: handles quoted fields
+    const fields = [];
+    let i = 0;
+    while (i < line.length) {
+      if (line[i] === '"') {
+        i++;
+        let val = '';
+        while (i < line.length) {
+          if (line[i] === '"' && line[i + 1] === '"') { val += '"'; i += 2; }
+          else if (line[i] === '"') { i++; break; }
+          else val += line[i++];
+        }
+        fields.push(val);
+      } else {
+        let val = '';
+        while (i < line.length && line[i] !== ',') val += line[i++];
+        fields.push(val.trim());
+      }
+      if (line[i] === ',') i++;
+    }
+    return fields;
+  }
+
+  const rows = lines.slice(1).map(parseRow);
+
+  // ── Generate tokens ────────────────────────────────────────────────────────
+  const ttlMs    = tenant.token_ttl_days * 24 * 60 * 60 * 1000;
+  const results  = [];
+  const skipped  = [];
+
+  for (const fields of rows) {
+    const policyNumber = fields[policyIdx]?.trim();
+    const email        = fields[emailIdx]?.trim();
+    const firstName    = nameIdx !== -1 ? (fields[nameIdx]?.trim() || '') : '';
+
+    if (!policyNumber || !email) { skipped.push({ policyNumber, email, reason: 'missing fields' }); continue; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { skipped.push({ policyNumber, email, reason: 'invalid email' }); continue; }
+
+    const token     = generateToken();
+    const expiresAt = new Date(Date.now() + ttlMs);
+
+    try {
+      await query(
+        `INSERT INTO pre_validation_tokens (tenant_id, token, policy_number, email, expires_at, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT DO NOTHING`,
+        [tenantId, token, policyNumber, email, expiresAt, req.admin.sub]
+      );
+      results.push({
+        policy_number: policyNumber,
+        email,
+        first_name:    firstName,
+        token_url:     `https://${tenant.subdomain}/register?token=${token}`,
+        expires_at:    expiresAt.toISOString(),
+        status:        'created',
+      });
+    } catch (err) {
+      skipped.push({ policyNumber, email, reason: err.message });
+    }
+  }
+
+  if (results.length === 0) {
+    return res.status(422).json({ error: 'No valid rows to import', skipped });
+  }
+
+  // ── Build output CSV ───────────────────────────────────────────────────────
+  const csvHeader = 'policy_number,email,first_name,token_url,expires_at,status\n';
+  const csvRows   = results.map(r =>
+    [r.policy_number, r.email, r.first_name, r.token_url, r.expires_at, r.status]
+      .map(v => `"${(v || '').replace(/"/g, '""')}"`)
+      .join(',')
+  ).join('\n');
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="tokens-${Date.now()}.csv"`);
+  res.send(csvHeader + csvRows);
 });
 
 // DELETE /api/admin/tokens/:id — revoke (expire immediately)
