@@ -162,6 +162,7 @@
     /* ── Form elements ───────────────────────────────────────────────────────── */
     .field { margin-bottom: 18px; }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field-row-swap { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: start; }
 
     label {
       display: block;
@@ -553,8 +554,7 @@
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
       transition: background 0.15s, color 0.15s;
-      align-self: center;
-      margin-top: 18px; /* align with inputs, below label */
+      margin-top: 22px; /* clear the label above the inputs */
     }
     .swap-btn:hover { background: var(--brand-light); color: var(--brand); border-color: var(--brand); }
 
@@ -1097,6 +1097,8 @@
       .main { padding: 20px 12px 60px; }
       .card { padding: 20px; }
       .field-row, .bank-grid { grid-template-columns: 1fr; gap: 0; }
+      .field-row-swap { grid-template-columns: 1fr; }
+      .field-row-swap .swap-btn { display: none; }
       .flight-route-display { font-size: 16px; }
       #dp-container { width: calc(100vw - 32px); left: 16px !important; }
     }
@@ -1240,7 +1242,7 @@
 
       <!-- Panel: route search -->
       <div id="panel-route" style="display:none">
-        <div class="field-row" style="margin-bottom:12px;align-items:flex-start">
+        <div class="field-row-swap" style="margin-bottom:12px">
           <div class="field airport-field" style="margin-bottom:0">
             <label>From</label>
             <input type="text" id="origin-input" placeholder="City or airport…" autocomplete="off"
@@ -1489,7 +1491,7 @@
 
             <!-- Panel: route search -->
             <div id="portal-panel-route" style="display:none">
-              <div class="field-row" style="margin-bottom:12px;align-items:flex-start">
+              <div class="field-row-swap" style="margin-bottom:12px">
                 <div class="field airport-field" style="margin-bottom:0">
                   <label>From</label>
                   <input type="text" id="portal-origin-input" placeholder="City or airport…" autocomplete="off"
