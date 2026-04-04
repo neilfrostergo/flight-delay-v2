@@ -799,8 +799,8 @@
 
     /* ── Header portal button ────────────────────────────────────────────────── */
     .header { justify-content: space-between; }
+    .portal-nav-btns { margin-left: auto; display: flex; align-items: center; gap: 8px; }
     .portal-nav-btn {
-      margin-left: auto;
       background: rgba(255,255,255,0.15);
       border: 1px solid rgba(255,255,255,0.35);
       color: #fff;
@@ -1100,8 +1100,10 @@
     <div class="header-brand" id="header-brand">Flight Delay Protection</div>
     <div class="header-sub" id="header-sub">Register your flight for automatic payout</div>
   </div>
-  <button class="portal-logout-pill" id="portal-logout-pill" onclick="portalHeaderLogout()" style="display:none">Log out</button>
-  <button class="portal-nav-btn" id="portal-toggle-btn" onclick="togglePortal()" style="display:none">My Account</button>
+  <div class="portal-nav-btns">
+    <button class="portal-nav-btn" id="portal-toggle-btn" onclick="togglePortal()" style="display:none">My Account</button>
+    <button class="portal-logout-pill" id="portal-logout-pill" onclick="portalHeaderLogout()" style="display:none">Log out</button>
+  </div>
 </header>
 
 <!-- ── Step indicator ────────────────────────────────────────────────────────── -->
@@ -2492,7 +2494,7 @@ async function showPortal() {
   document.getElementById('portal-view').style.display = '';
   document.querySelector('main').style.display = 'none';
   document.getElementById('stepper').style.display = 'none';
-  document.getElementById('portal-toggle-btn').textContent = '← Back';
+  document.getElementById('portal-toggle-btn').textContent = 'Register flights';
 
   // Restore saved session from localStorage (survives page reloads)
   portalRestoreSession();
