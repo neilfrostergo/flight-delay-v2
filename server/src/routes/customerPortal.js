@@ -99,7 +99,9 @@ router.post('/sessions', async (req, res) => {
 
   // Fetch policy detail fields to include in the JWT payload
   const regDetail = await query(
-    `SELECT policy_number, policy_type, travelers, cover_summary
+    `SELECT policy_number, policy_type, travelers, cover_summary,
+            policy_wording_url, policy_wording_name,
+            ipid_url, ipid_name, key_facts_url, key_facts_name
      FROM registrations WHERE id = $1`,
     [registrationId]
   );
@@ -108,23 +110,48 @@ router.post('/sessions', async (req, res) => {
   // For registrations created before policy detail columns existed, re-validate
   // the policy to populate the JWT with fresh data (and backfill the DB row).
   let policyDetail = {
-    policy_type:   regDetailRow.policy_type   || null,
-    travelers:     regDetailRow.travelers      || null,
-    cover_summary: regDetailRow.cover_summary  || null,
+    policy_type:          regDetailRow.policy_type          || null,
+    travelers:            regDetailRow.travelers             || null,
+    cover_summary:        regDetailRow.cover_summary         || null,
+    policy_wording_url:   regDetailRow.policy_wording_url   || null,
+    policy_wording_name:  regDetailRow.policy_wording_name  || null,
+    ipid_url:             regDetailRow.ipid_url             || null,
+    ipid_name:            regDetailRow.ipid_name            || null,
+    key_facts_url:        regDetailRow.key_facts_url        || null,
+    key_facts_name:       regDetailRow.key_facts_name       || null,
   };
 
-  if (!policyDetail.policy_type) {
+  // Re-validate if any key fields are missing (handles registrations created before these columns existed)
+  if (!policyDetail.policy_type || !policyDetail.policy_wording_url) {
     const fresh = await validatePolicy(req.tenant, regDetailRow.policy_number, email.trim());
     if (fresh.valid) {
       policyDetail = {
-        policy_type:   fresh.policyType    || null,
-        travelers:     fresh.travelers      || null,
-        cover_summary: fresh.coverSummary   || null,
+        policy_type:          fresh.policyType          || policyDetail.policy_type   || null,
+        travelers:            fresh.travelers            || policyDetail.travelers     || null,
+        cover_summary:        fresh.coverSummary        || policyDetail.cover_summary || null,
+        policy_wording_url:   fresh.policyWordingUrl    || null,
+        policy_wording_name:  fresh.policyWordingName   || null,
+        ipid_url:             fresh.ipidUrl             || null,
+        ipid_name:            fresh.ipidName            || null,
+        key_facts_url:        fresh.keyFactsUrl         || null,
+        key_facts_name:       fresh.keyFactsName        || null,
       };
       // Backfill so subsequent logins don't need to re-validate
       await query(
-        `UPDATE registrations SET policy_type=$1, travelers=$2, cover_summary=$3 WHERE id=$4`,
-        [policyDetail.policy_type, JSON.stringify(policyDetail.travelers), JSON.stringify(policyDetail.cover_summary), registrationId]
+        `UPDATE registrations
+            SET policy_type=$1, travelers=$2, cover_summary=$3,
+                policy_wording_url=$4, policy_wording_name=$5,
+                ipid_url=$6, ipid_name=$7, key_facts_url=$8, key_facts_name=$9
+          WHERE id=$10`,
+        [
+          policyDetail.policy_type,
+          JSON.stringify(policyDetail.travelers),
+          JSON.stringify(policyDetail.cover_summary),
+          policyDetail.policy_wording_url,  policyDetail.policy_wording_name,
+          policyDetail.ipid_url,            policyDetail.ipid_name,
+          policyDetail.key_facts_url,       policyDetail.key_facts_name,
+          registrationId,
+        ]
       );
     }
   }

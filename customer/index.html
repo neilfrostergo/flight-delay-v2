@@ -2974,11 +2974,6 @@ function renderPortalDash(reg) {
         <span class="p-label">Delay payout</span>
         <span class="p-value" style="color:var(--brand);font-size:16px;font-weight:800">${payoutPounds} <span style="font-size:12px;font-weight:400;color:var(--muted)">per person</span></span>
       </div>
-      ${reg.created_at ? `
-      <div class="p-row">
-        <span class="p-label">Policy issued</span>
-        <span class="p-value">${fmtDate(reg.created_at)}</span>
-      </div>` : ''}
       ${docLinksHtml ? `
       <div class="p-row" style="align-items:center">
         <span class="p-label">Documents</span>
