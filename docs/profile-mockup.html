@@ -163,34 +163,70 @@
   }
   .big-label { font-size: 12px; color: var(--muted); }
 
-  /* ── Cover table ── */
-  .cover-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-  .cover-table th {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--muted);
+  /* ── Cover accordion ── */
+  .cover-accordion { display: flex; flex-direction: column; gap: 6px; }
+
+  .cover-item { border-radius: var(--radius-sm); border: 1px solid var(--border); overflow: hidden; }
+  .cover-item.pinned { border-color: rgba(238,1,56,0.3); background: var(--brand-light); }
+
+  .cover-trigger {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
     text-align: left;
-    padding: 0 0 8px;
-    border-bottom: 1px solid var(--border);
+    font-family: inherit;
   }
-  .cover-table th:not(:first-child) { text-align: right; }
-  .cover-table td {
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px;
-    vertical-align: top;
+  .cover-item.pinned .cover-trigger { cursor: default; }
+
+  .cover-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
   }
-  .cover-table tr:last-child td { border-bottom: none; }
-  .cover-table td:not(:first-child) { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .benefit-name { font-weight: 600; }
-  .benefit-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .highlight-row td { background: var(--brand-light); }
-  .highlight-row td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); padding-left: 8px; }
-  .highlight-row td:last-child  { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding-right: 8px; }
-  .highlight-row td { color: var(--brand); }
-  .highlight-row td .benefit-desc { color: rgba(238,1,56,0.6); }
+  .cover-item.pinned .cover-icon { background: rgba(238,1,56,0.1); }
+
+  .cover-trigger-text { flex: 1; }
+  .cover-trigger-name { font-size: 13px; font-weight: 700; color: var(--text); }
+  .cover-item.pinned .cover-trigger-name { color: var(--brand); }
+  .cover-trigger-limit { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .cover-item.pinned .cover-trigger-limit { color: rgba(238,1,56,0.7); font-weight: 600; }
+
+  .cover-chevron {
+    font-size: 11px;
+    color: var(--muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .cover-item[open] .cover-chevron,
+  .cover-item.open .cover-chevron { transform: rotate(180deg); }
+
+  .cover-body {
+    padding: 0 14px 14px;
+    display: none;
+  }
+  .cover-item.pinned .cover-body,
+  .cover-item.open .cover-body { display: block; }
+
+  .cover-body-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .cover-stat { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
+  .cover-item.pinned .cover-stat { background: rgba(255,255,255,0.6); }
+  .cover-stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  .cover-stat-value { font-size: 16px; font-weight: 800; color: var(--text); margin-top: 2px; }
+  .cover-item.pinned .cover-stat-value { color: var(--brand); }
+  .cover-desc { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
 
   /* ── Travelers ── */
   .traveler-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
@@ -480,73 +516,183 @@
 
     <div class="card">
       <div class="card-title"><span class="card-title-icon">🛡️</span> Cover summary</div>
-      <table class="cover-table">
-        <thead>
-          <tr>
-            <th>Benefit</th>
-            <th>Limit</th>
-            <th>Excess</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="highlight-row">
-            <td>
-              <div class="benefit-name">Flight Delay</div>
-              <div class="benefit-desc">Automatic payout after 3-hour delay</div>
-            </td>
-            <td>£250</td>
-            <td>Nil</td>
-          </tr>
-          <tr>
-            <td>
-              <div class="benefit-name">Travel Delay</div>
-              <div class="benefit-desc">Payable after a qualifying 12-hour delay</div>
-            </td>
-            <td>£280</td>
-            <td>Nil</td>
-          </tr>
-          <tr>
-            <td>
-              <div class="benefit-name">Cancellation</div>
-              <div class="benefit-desc">Trip cancellation for covered reasons</div>
-            </td>
-            <td>£3,000</td>
-            <td>£100</td>
-          </tr>
-          <tr>
-            <td>
-              <div class="benefit-name">Emergency Medical</div>
-              <div class="benefit-desc">Medical and repatriation expenses abroad</div>
-            </td>
-            <td>£10M</td>
-            <td>£100</td>
-          </tr>
-          <tr>
-            <td>
-              <div class="benefit-name">Missed Departure</div>
-              <div class="benefit-desc">Additional travel costs</div>
-            </td>
-            <td>£1,000</td>
-            <td>Nil</td>
-          </tr>
-          <tr>
-            <td>
-              <div class="benefit-name">Personal Possessions</div>
-              <div class="benefit-desc">Loss, theft or damage to belongings</div>
-            </td>
-            <td>£1,500</td>
-            <td>£50</td>
-          </tr>
-          <tr>
-            <td>
-              <div class="benefit-name">Personal Liability</div>
-              <div class="benefit-desc">Legal liability to third parties</div>
-            </td>
-            <td>£2M</td>
-            <td>Nil</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="cover-accordion">
+
+        <!-- Pinned: Flight Delay — always open -->
+        <div class="cover-item pinned">
+          <div class="cover-trigger">
+            <div class="cover-icon">✈️</div>
+            <div class="cover-trigger-text">
+              <div class="cover-trigger-name">Flight Delay</div>
+              <div class="cover-trigger-limit">£250 per person · Nil excess</div>
+            </div>
+          </div>
+          <div class="cover-body">
+            <div class="cover-body-grid">
+              <div class="cover-stat">
+                <div class="cover-stat-label">Limit</div>
+                <div class="cover-stat-value">£250</div>
+              </div>
+              <div class="cover-stat">
+                <div class="cover-stat-label">Excess</div>
+                <div class="cover-stat-value">Nil</div>
+              </div>
+            </div>
+            <div class="cover-desc">Automatic payout after a qualifying 3-hour delay — no claim form needed.</div>
+          </div>
+        </div>
+
+        <!-- Travel Delay -->
+        <div class="cover-item" onclick="toggleCover(this)">
+          <button class="cover-trigger">
+            <div class="cover-icon">🕐</div>
+            <div class="cover-trigger-text">
+              <div class="cover-trigger-name">Travel Delay</div>
+              <div class="cover-trigger-limit">Up to £280 · Nil excess</div>
+            </div>
+            <span class="cover-chevron">▼</span>
+          </button>
+          <div class="cover-body">
+            <div class="cover-body-grid">
+              <div class="cover-stat">
+                <div class="cover-stat-label">Limit</div>
+                <div class="cover-stat-value">£280</div>
+              </div>
+              <div class="cover-stat">
+                <div class="cover-stat-label">Excess</div>
+                <div class="cover-stat-value">Nil</div>
+              </div>
+            </div>
+            <div class="cover-desc">Payable after a qualifying 12-hour delay to your outbound journey.</div>
+          </div>
+        </div>
+
+        <!-- Cancellation -->
+        <div class="cover-item" onclick="toggleCover(this)">
+          <button class="cover-trigger">
+            <div class="cover-icon">❌</div>
+            <div class="cover-trigger-text">
+              <div class="cover-trigger-name">Cancellation</div>
+              <div class="cover-trigger-limit">Up to £3,000 · £100 excess</div>
+            </div>
+            <span class="cover-chevron">▼</span>
+          </button>
+          <div class="cover-body">
+            <div class="cover-body-grid">
+              <div class="cover-stat">
+                <div class="cover-stat-label">Limit</div>
+                <div class="cover-stat-value">£3,000</div>
+              </div>
+              <div class="cover-stat">
+                <div class="cover-stat-label">Excess</div>
+                <div class="cover-stat-value">£100</div>
+              </div>
+            </div>
+            <div class="cover-desc">Trip cancellation costs for covered reasons such as illness, bereavement or redundancy.</div>
+          </div>
+        </div>
+
+        <!-- Emergency Medical -->
+        <div class="cover-item" onclick="toggleCover(this)">
+          <button class="cover-trigger">
+            <div class="cover-icon">🏥</div>
+            <div class="cover-trigger-text">
+              <div class="cover-trigger-name">Emergency Medical</div>
+              <div class="cover-trigger-limit">Up to £10M · £100 excess</div>
+            </div>
+            <span class="cover-chevron">▼</span>
+          </button>
+          <div class="cover-body">
+            <div class="cover-body-grid">
+              <div class="cover-stat">
+                <div class="cover-stat-label">Limit</div>
+                <div class="cover-stat-value">£10M</div>
+              </div>
+              <div class="cover-stat">
+                <div class="cover-stat-label">Excess</div>
+                <div class="cover-stat-value">£100</div>
+              </div>
+            </div>
+            <div class="cover-desc">Medical treatment and repatriation expenses incurred abroad.</div>
+          </div>
+        </div>
+
+        <!-- Missed Departure -->
+        <div class="cover-item" onclick="toggleCover(this)">
+          <button class="cover-trigger">
+            <div class="cover-icon">🚌</div>
+            <div class="cover-trigger-text">
+              <div class="cover-trigger-name">Missed Departure</div>
+              <div class="cover-trigger-limit">Up to £1,000 · Nil excess</div>
+            </div>
+            <span class="cover-chevron">▼</span>
+          </button>
+          <div class="cover-body">
+            <div class="cover-body-grid">
+              <div class="cover-stat">
+                <div class="cover-stat-label">Limit</div>
+                <div class="cover-stat-value">£1,000</div>
+              </div>
+              <div class="cover-stat">
+                <div class="cover-stat-label">Excess</div>
+                <div class="cover-stat-value">Nil</div>
+              </div>
+            </div>
+            <div class="cover-desc">Additional travel and accommodation costs if you miss your departure due to an incident.</div>
+          </div>
+        </div>
+
+        <!-- Personal Possessions -->
+        <div class="cover-item" onclick="toggleCover(this)">
+          <button class="cover-trigger">
+            <div class="cover-icon">🧳</div>
+            <div class="cover-trigger-text">
+              <div class="cover-trigger-name">Personal Possessions</div>
+              <div class="cover-trigger-limit">Up to £1,500 · £50 excess</div>
+            </div>
+            <span class="cover-chevron">▼</span>
+          </button>
+          <div class="cover-body">
+            <div class="cover-body-grid">
+              <div class="cover-stat">
+                <div class="cover-stat-label">Limit</div>
+                <div class="cover-stat-value">£1,500</div>
+              </div>
+              <div class="cover-stat">
+                <div class="cover-stat-label">Excess</div>
+                <div class="cover-stat-value">£50</div>
+              </div>
+            </div>
+            <div class="cover-desc">Loss, theft or accidental damage to your belongings during the trip.</div>
+          </div>
+        </div>
+
+        <!-- Personal Liability -->
+        <div class="cover-item" onclick="toggleCover(this)">
+          <button class="cover-trigger">
+            <div class="cover-icon">⚖️</div>
+            <div class="cover-trigger-text">
+              <div class="cover-trigger-name">Personal Liability</div>
+              <div class="cover-trigger-limit">Up to £2M · Nil excess</div>
+            </div>
+            <span class="cover-chevron">▼</span>
+          </button>
+          <div class="cover-body">
+            <div class="cover-body-grid">
+              <div class="cover-stat">
+                <div class="cover-stat-label">Limit</div>
+                <div class="cover-stat-value">£2M</div>
+              </div>
+              <div class="cover-stat">
+                <div class="cover-stat-label">Excess</div>
+                <div class="cover-stat-value">Nil</div>
+              </div>
+            </div>
+            <div class="cover-desc">Legal liability to third parties for accidental injury or property damage.</div>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <div class="card">
@@ -601,5 +747,10 @@
 
 </main>
 
+<script>
+function toggleCover(item) {
+  item.classList.toggle('open');
+}
+</script>
 </body>
 </html>
