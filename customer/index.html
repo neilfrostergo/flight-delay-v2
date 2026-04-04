@@ -1103,11 +1103,11 @@
     .portal-flight-card {
       background: var(--white);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      margin-bottom: 16px;
-      box-shadow: var(--shadow-sm);
+      border-radius: var(--radius-sm);
+      margin-bottom: 12px;
       overflow: hidden;
     }
+    .portal-flight-card:last-child { margin-bottom: 0; }
     .portal-flight-header {
       display: flex;
       align-items: center;
@@ -1627,15 +1627,9 @@
     <div id="portal-dash" style="display:none">
       <div id="portal-reg-summary"></div>
       <div id="portal-flights-list"></div>
-      <div id="portal-cover-section"></div>
 
-      <!-- Add flight -->
-      <div style="margin-top:16px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:0">
-          <button class="btn btn-outline" id="portal-add-toggle-btn" onclick="togglePortalAddFlight()">+ Add a flight</button>
-          <button class="btn btn-outline" onclick="portalLogout()">Log out</button>
-        </div>
-        <div id="portal-add-flight-form" style="display:none;margin-top:12px">
+      <!-- Add flight form — appears directly below the flights card when opened -->
+      <div id="portal-add-flight-form" style="display:none;margin-bottom:20px">
           <div class="card" style="padding:16px">
             <div class="card-title" style="font-size:15px;margin-bottom:12px">Add a flight</div>
 
@@ -1708,6 +1702,12 @@
             </div>
           </div>
         </div>
+
+      <div id="portal-cover-section"></div>
+
+      <div style="margin-top:20px;text-align:right">
+        <button class="btn btn-outline" id="portal-add-toggle-btn" style="display:none" onclick="togglePortalAddFlight()">+ Add a flight</button>
+        <button class="btn btn-outline" onclick="portalLogout()">Log out</button>
       </div>
 
     </div>
@@ -2855,9 +2855,6 @@ async function showPortalDash() {
 }
 
 function renderPortalDash(reg) {
-  // Hide the "Add a flight" button for policy-only sessions (no registration row)
-  const addBtn = document.getElementById('portal-add-toggle-btn');
-  if (addBtn) addBtn.style.display = reg.id ? '' : 'none';
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -2911,6 +2908,7 @@ function renderPortalDash(reg) {
       <div class="portal-avatar">${heroInit}</div>
       <div class="portal-hero-body">
         <div class="portal-hero-name">${heroName}</div>
+        ${reg.email ? `<div class="portal-hero-email">${escHtml(reg.email)}</div>` : ''}
         <div class="portal-hero-pills">
           <span class="portal-pill portal-pill-green"><span class="portal-pill-dot"></span>Policy active</span>
           ${policyTypeLabel ? `<span class="portal-pill portal-pill-blue">${escHtml(policyTypeLabel)}</span>` : ''}
@@ -3109,7 +3107,7 @@ function renderPortalDash(reg) {
 
     coverSummaryHtml = `
       <div class="portal-cover-card">
-        <div class="portal-section-title">Your cover summary</div>
+        <div class="p-card-title">🛡️ Your cover summary</div>
         ${pinnedHtml}
         ${groupsHtml}
       </div>`;
@@ -3119,27 +3117,33 @@ function renderPortalDash(reg) {
 
   if (!reg.flights || reg.flights.length === 0) {
     document.getElementById('portal-flights-list').innerHTML = `
-      <p class="portal-section-title">Registered flights</p>
-      <div style="text-align:center;padding:32px 24px;">
-        <div style="font-size:40px;margin-bottom:12px">✈️</div>
-        <div style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:8px">No flights registered yet</div>
-        <p style="font-size:14px;color:var(--muted);margin-bottom:20px">
-          Use the registration form to add flights to your policy and activate your automatic delay protection.
-        </p>
-      </div>
-      <div style="display:flex;justify-content:space-between;">
-        <button class="btn btn-outline" onclick="hidePortal()">Register a flight →</button>
-        <button class="btn btn-outline" onclick="portalLogout()">Log out</button>
+      <div class="p-card" style="margin-bottom:20px">
+        <div class="p-card-title">✈️ Registered flights</div>
+        <div style="text-align:center;padding:24px 16px;">
+          <div style="font-size:36px;margin-bottom:10px">✈️</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">No flights registered yet</div>
+          <p style="font-size:13px;color:var(--muted);">
+            Use the form below to add flights to your policy and activate automatic delay protection.
+          </p>
+        </div>
+        ${reg.id ? `<div style="margin-top:8px"><button class="btn btn-outline" style="font-size:13px" onclick="togglePortalAddFlight()">+ Add a flight</button></div>` : ''}
       </div>`;
-    document.getElementById('portal-add-toggle-btn').closest('div').style.display = 'none';
     document.getElementById('portal-cover-section').innerHTML = coverSummaryHtml;
     return;
   }
 
-  document.getElementById('portal-add-toggle-btn').closest('div').style.display = '';
-  document.getElementById('portal-flights-list').innerHTML =
-    '<p class="portal-section-title" style="margin-bottom:12px">Registered flights</p>' +
-    reg.flights.map(f => renderPortalFlightCard(f, reg)).join('');
+  const flightsHtml = reg.flights.map(f => renderPortalFlightCard(f, reg)).join('');
+  const addFlightBtnHtml = reg.id
+    ? `<button class="btn btn-outline" style="font-size:12px;padding:5px 10px" onclick="togglePortalAddFlight()">+ Add a flight</button>`
+    : '';
+  document.getElementById('portal-flights-list').innerHTML = `
+    <div class="p-card" style="margin-bottom:20px">
+      <div class="p-card-title" style="justify-content:space-between">
+        <span>✈️ Registered flights</span>
+        ${addFlightBtnHtml}
+      </div>
+      ${flightsHtml}
+    </div>`;
 
   // ── Inject cover summary ───────────────────────────────────────────────────
 
