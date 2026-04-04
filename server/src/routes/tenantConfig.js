@@ -21,6 +21,7 @@ router.get('/', (req, res) => {
     termsUrl:      req.tenant.terms_url,
     supportEmail:  req.tenant.support_email,
     portalLabel:   req.tenant.portal_label || 'My Account',
+    claimsUrl:     req.tenant.register_claim_url || null,
     // Operational config the customer SPA needs
     minHoursBeforeDep: req.tenant.min_hours_before_dep,
     maxDaysBeforeDep:  req.tenant.max_days_before_dep || 40,

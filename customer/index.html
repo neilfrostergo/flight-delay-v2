@@ -927,6 +927,23 @@
     .portal-pill-blue   { background: #eff6ff; color: #2563eb; }
     .portal-pill-brand  { background: var(--brand-light); color: var(--brand); }
 
+    /* ── Expired policy banner ── */
+    .portal-expiry-banner {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      box-shadow: var(--shadow-sm);
+    }
+    .portal-expiry-icon { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+    .portal-expiry-body { flex: 1; min-width: 0; }
+    .portal-expiry-title { font-size: 15px; font-weight: 700; color: var(--warn); margin-bottom: 6px; }
+    .portal-expiry-text  { font-size: 13px; color: var(--text); line-height: 1.5; }
+
     /* ── Stats row ── */
     .portal-stats-grid {
       display: grid;
@@ -2856,6 +2873,11 @@ async function showPortalDash() {
 
 function renderPortalDash(reg) {
 
+  // ── Expiry check ───────────────────────────────────────────────────────────
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const policyExpired = reg.cover_end_date && new Date(reg.cover_end_date) < today;
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   const policyTypeLabelMap = {
@@ -2882,8 +2904,7 @@ function renderPortalDash(reg) {
   const payoutCount  = (reg.flights || []).filter(f => f.status === 'paid').length;
   let daysRemaining  = null;
   if (reg.cover_end_date) {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const end   = new Date(reg.cover_end_date);
+    const end = new Date(reg.cover_end_date);
     daysRemaining = Math.max(0, Math.round((end - today) / 86400000));
   }
 
@@ -3021,10 +3042,23 @@ function renderPortalDash(reg) {
       ${travelersChipsHtml}
     </div>`;
 
+  // ── Expiry banner ──────────────────────────────────────────────────────────
+
+  const claimsUrl  = state.tenant?.claimsUrl || null;
+  const expiryBannerHtml = policyExpired ? `
+    <div class="portal-expiry-banner">
+      <div class="portal-expiry-icon">⚠️</div>
+      <div class="portal-expiry-body">
+        <div class="portal-expiry-title">Your policy cover ended on ${fmtDate(reg.cover_end_date)}</div>
+        <div class="portal-expiry-text">You cannot register new flights — the delay benefit only applies to flights during your active cover period. If you experienced a qualifying delay while your policy was active, you can make a claim below.</div>
+        ${claimsUrl ? `<a href="${escHtml(claimsUrl)}" class="btn btn-primary" target="_blank" rel="noopener" style="margin-top:12px;display:inline-block">Make a claim →</a>` : ''}
+      </div>
+    </div>` : '';
+
   // ── Inject hero + stats + 2-col grid ──────────────────────────────────────
 
   document.getElementById('portal-reg-summary').innerHTML =
-    heroHtml + statsHtml +
+    expiryBannerHtml + heroHtml + statsHtml +
     `<div class="portal-grid-2">${policyCardHtml}${coverPeriodCardHtml}</div>`;
 
   // ── Build cover summary accordion HTML ────────────────────────────────────
@@ -3121,14 +3155,14 @@ function renderPortalDash(reg) {
             Use the form below to add flights to your policy and activate automatic delay protection.
           </p>
         </div>
-        ${reg.id ? `<div style="margin-top:8px"><button class="btn btn-outline" style="font-size:13px" onclick="togglePortalAddFlight()">+ Add a flight</button></div>` : ''}
+        ${reg.id && !policyExpired ? `<div style="margin-top:8px"><button class="btn btn-outline" style="font-size:13px" onclick="togglePortalAddFlight()">+ Add a flight</button></div>` : ''}
       </div>`;
     document.getElementById('portal-cover-section').innerHTML = coverSummaryHtml;
     return;
   }
 
   const flightsHtml = reg.flights.map(f => renderPortalFlightCard(f, reg)).join('');
-  const addFlightBtnHtml = reg.id
+  const addFlightBtnHtml = reg.id && !policyExpired
     ? `<button class="btn btn-outline" style="font-size:12px;padding:5px 10px" onclick="togglePortalAddFlight()">+ Add a flight</button>`
     : '';
   document.getElementById('portal-flights-list').innerHTML = `
