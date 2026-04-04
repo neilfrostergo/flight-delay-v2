@@ -37,7 +37,13 @@ router.post('/', async (req, res) => {
     payoutPence: result.payoutPence,
     coverStartDate: result.coverStartDate,
     coverEndDate: result.coverEndDate,
-    coverSummary: result.coverSummary || null,
+    coverSummary:      result.coverSummary      || null,
+    policyWordingUrl:  result.policyWordingUrl  || null,
+    policyWordingName: result.policyWordingName || null,
+    ipidUrl:           result.ipidUrl           || null,
+    ipidName:          result.ipidName          || null,
+    keyFactsUrl:       result.keyFactsUrl       || null,
+    keyFactsName:      result.keyFactsName      || null,
     policyNumber: value.policy_number,
   });
 });

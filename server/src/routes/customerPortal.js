@@ -173,7 +173,9 @@ router.get('/registration', requireCustomer, async (req, res) => {
   const regResult = await query(
     `SELECT id, policy_number, first_name, last_name, email,
             payout_pence, cover_start_date, cover_end_date, status, created_at,
-            policy_type, travelers, cover_summary
+            policy_type, travelers, cover_summary,
+            policy_wording_url, policy_wording_name,
+            ipid_url, ipid_name, key_facts_url, key_facts_name
      FROM registrations WHERE id = $1 AND tenant_id = $2`,
     [req.customer.sub, req.tenant.id]
   );

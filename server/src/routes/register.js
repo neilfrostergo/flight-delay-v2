@@ -36,6 +36,12 @@ const registrationSchema = Joi.object({
   policy_type:             Joi.string().trim().max(50).allow(null).optional(),
   travelers:               Joi.array().items(Joi.object()).allow(null).optional(),
   cover_summary:           Joi.array().items(Joi.object()).allow(null).optional(),
+  policy_wording_url:      Joi.string().uri().allow(null, '').optional(),
+  policy_wording_name:     Joi.string().max(200).allow(null, '').optional(),
+  ipid_url:                Joi.string().uri().allow(null, '').optional(),
+  ipid_name:               Joi.string().max(200).allow(null, '').optional(),
+  key_facts_url:           Joi.string().uri().allow(null, '').optional(),
+  key_facts_name:          Joi.string().max(200).allow(null, '').optional(),
 });
 
 // POST /api/registrations
@@ -95,8 +101,10 @@ router.post('/', async (req, res) => {
             payout_pence, cover_start_date, cover_end_date,
             bank_sort_code_enc, bank_account_enc,
             pre_validation_token_id, ip_address, status,
-            policy_type, travelers, cover_summary)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::inet,'active',$13,$14,$15)
+            policy_type, travelers, cover_summary,
+            policy_wording_url, policy_wording_name,
+            ipid_url, ipid_name, key_facts_url, key_facts_name)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::inet,'active',$13,$14,$15,$16,$17,$18,$19,$20,$21)
          ON CONFLICT (tenant_id, policy_number) DO NOTHING
          RETURNING id, policy_number, created_at`,
         [
@@ -112,9 +120,15 @@ router.post('/', async (req, res) => {
           encrypt(value.bank_account),
           value.pre_validation_token_id || null,
           ip,
-          value.policy_type  || null,
-          value.travelers    ? JSON.stringify(value.travelers)    : null,
+          value.policy_type   || null,
+          value.travelers     ? JSON.stringify(value.travelers)     : null,
           value.cover_summary ? JSON.stringify(value.cover_summary) : null,
+          value.policy_wording_url  || null,
+          value.policy_wording_name || null,
+          value.ipid_url            || null,
+          value.ipid_name           || null,
+          value.key_facts_url       || null,
+          value.key_facts_name      || null,
         ]
       );
 
