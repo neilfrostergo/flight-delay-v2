@@ -308,12 +308,12 @@ async function liveValidate(tenant, policyNumber, email) {
     coverStartDate: policy.startDate || null,
     coverEndDate:   policy.endDate   || null,
     coverSummary,
-    policyWordingUrl:  policy.scheme?.PolicyWordingDocumentUrl  || null,
-    policyWordingName: policy.scheme?.PolicyWordingDocumentName || 'Policy Wording',
-    ipidUrl:           policy.scheme?.IPIDFileUrl               || null,
-    ipidName:          policy.scheme?.IPIDFileName              || 'IPID',
-    keyFactsUrl:       policy.scheme?.KeyFactsDocumentUrl       || null,
-    keyFactsName:      policy.scheme?.KeyFactsDocumentName      || 'Key Facts',
+    policyWordingUrl:  policy.policyWordingDocumentUrl || null,
+    policyWordingName: 'Policy Wording',
+    ipidUrl:           policy.ipidFileUrl || null,
+    ipidName:          'IPID',
+    keyFactsUrl:       (policy.keyFactsDocumentUrl && !policy.keyFactsDocumentUrl.endsWith('/') ? policy.keyFactsDocumentUrl : null),
+    keyFactsName:      'Key Facts',
     rawResponse:    body,
   };
 }

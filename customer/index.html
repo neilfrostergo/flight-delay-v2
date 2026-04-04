@@ -881,42 +881,93 @@
       margin-top: 2px;
     }
 
-    .portal-cover-summary {
+    /* ── Cover summary accordion ── */
+    .portal-cover-card {
       background: var(--white);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 14px 20px;
+      padding: 16px 20px;
       margin-bottom: 20px;
       box-shadow: var(--shadow-sm);
     }
-    .portal-cover-summary summary::-webkit-details-marker { display: none; }
-    .portal-cover-summary summary { outline: none; }
+    .portal-cover-card .portal-section-title { margin-bottom: 12px; }
 
-    .portal-cover-table {
-      margin-top: 12px;
-      width: 100%;
-      border-collapse: collapse;
+    .cover-pinned {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(142,0,56,0.3);
+      background: var(--brand-light);
+      margin-bottom: 4px;
+    }
+    .cover-pinned-icon {
+      width: 30px; height: 30px;
+      border-radius: 7px;
+      background: rgba(142,0,56,0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .cover-pinned-body { flex: 1; min-width: 0; }
+    .cover-pinned-name { font-size: 13px; font-weight: 700; color: var(--brand); }
+    .cover-pinned-desc { font-size: 11px; color: rgba(142,0,56,0.65); margin-top: 2px; line-height: 1.35; }
+    .cover-pinned-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+    .cover-pinned-limit { font-size: 14px; font-weight: 800; color: var(--brand); white-space: nowrap; }
+    .cover-pinned-excess { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+    details.cover-acc { border-top: 1px solid var(--border); }
+    details.cover-acc summary {
+      list-style: none; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      padding: 11px 2px;
+      user-select: none;
       font-size: 13px;
     }
-    .portal-cover-table th {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--muted);
-      text-align: left;
-      padding: 4px 6px 6px;
-      border-bottom: 1px solid var(--border);
+    details.cover-acc summary::-webkit-details-marker { display: none; }
+    details.cover-acc summary:hover { color: var(--brand); }
+    .acc-icon { font-size: 14px; flex-shrink: 0; }
+    .acc-label { font-weight: 700; flex: 1; }
+    .acc-count {
+      font-size: 11px; color: var(--muted); font-weight: 500;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1px 7px;
     }
-    .portal-cover-table td {
-      padding: 7px 6px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
+    .acc-chevron { font-size: 11px; color: var(--muted); transition: transform 0.2s ease; margin-left: 2px; }
+    details.cover-acc[open] .acc-chevron { transform: rotate(180deg); }
+
+    .acc-body-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.22s ease; }
+    details.cover-acc[open] .acc-body-wrap { grid-template-rows: 1fr; }
+    details.cover-acc.closing .acc-body-wrap { grid-template-rows: 0fr; }
+    .acc-body-inner { overflow: hidden; }
+
+    .cover-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      padding-bottom: 10px;
     }
-    .portal-cover-table tr:last-child td { border-bottom: none; }
-    .portal-cover-table .cover-name  { font-weight: 600; }
-    .portal-cover-table .cover-limit { font-weight: 700; white-space: nowrap; }
-    .portal-cover-table .cover-excess { color: var(--muted); white-space: nowrap; }
+    @media (max-width: 540px) { .cover-grid { grid-template-columns: 1fr; } }
+
+    .cover-ci {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 9px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--white);
+    }
+    .cover-ci-icon {
+      width: 26px; height: 26px; border-radius: 6px;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; flex-shrink: 0; margin-top: 1px;
+    }
+    .cover-ci-body { flex: 1; min-width: 0; }
+    .cover-ci-name { font-size: 12px; font-weight: 700; color: var(--text); }
+    .cover-ci-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+    .cover-ci-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+    .cover-ci-limit { font-size: 12px; font-weight: 800; color: var(--text); white-space: nowrap; }
+    .cover-ci-excess { font-size: 10px; color: var(--muted); white-space: nowrap; }
 
     .portal-flight-card {
       background: var(--white);
@@ -2694,32 +2745,87 @@ function renderPortalDash(reg) {
     ? travelers.map(t => escHtml(`${t.firstName || ''} ${t.lastName || ''}`.trim())).join(', ')
     : null;
 
-  // Build cover summary HTML
+  // Build cover summary accordion HTML
   const coverSummary = reg.cover_summary || null;
-  const coverSummaryHtml = coverSummary && coverSummary.length
-    ? `<details class="portal-cover-summary">
-        <summary class="portal-section-title" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px">
-          Your cover summary <span style="font-weight:400;font-size:11px;letter-spacing:0;text-transform:none">▸</span>
+
+  function coverCategory(name) {
+    const n = (name || '').toLowerCase();
+    if (/travel delay|delay benefit/.test(n))                           return null; // pinned separately
+    if (/abandonment|cancel|curtail|missed dep|additional travel|baggage delay/.test(n)) return { g: 'Trip protection',    i: '✈️' };
+    if (/medical|dental|hospital|mugging|physio|prescription|funeral|repatri/.test(n))  return { g: 'Medical & emergency', i: '🏥' };
+    if (/death|disablement|personal accident/.test(n))                  return { g: 'Personal accident',  i: '👤' };
+    if (/possess|baggage|cash|money|passport|gadget|valuables|single item/.test(n))     return { g: 'Baggage & belongings',i: '🧳' };
+    if (/liability|legal|hijack|excess|deposit/.test(n))                return { g: 'Legal & liability',  i: '⚖️' };
+    if (/golf|green fee|hole.in.one/.test(n))                           return { g: 'Golf',                i: '⛳' };
+    if (/ski|winter|piste|avalanche|snowboard/.test(n))                 return { g: 'Winter sports',       i: '⛷️' };
+    if (/vehicle|windscreen|tyre|roof|undercarriage|window|sunroof/.test(n)) return { g: 'Vehicle',        i: '🚗' };
+    if (/covid/.test(n))                                                return { g: 'COVID-19',            i: '🦠' };
+    return { g: 'Other', i: '📋' };
+  }
+
+  function coverItemHtml(c) {
+    return `<div class="cover-ci">
+      <div class="cover-ci-icon">📄</div>
+      <div class="cover-ci-body">
+        <div class="cover-ci-name">${escHtml(c.name || '')}</div>
+        ${c.description ? `<div class="cover-ci-desc">${escHtml(c.description)}</div>` : ''}
+      </div>
+      <div class="cover-ci-meta">
+        <div class="cover-ci-limit">${fmtCoverLimit(c.limit)}</div>
+        <div class="cover-ci-excess">${c.excess ? '£' + c.excess + ' excess' : 'Nil excess'}</div>
+      </div>
+    </div>`;
+  }
+
+  let coverSummaryHtml = '';
+  if (coverSummary && coverSummary.length) {
+    // Separate pinned item (travel delay benefit)
+    const pinned = coverSummary.find(c => /(travel delay|delay benefit)/i.test(c.name || ''));
+    const rest   = coverSummary.filter(c => c !== pinned);
+
+    // Group remaining items
+    const groups = new Map();
+    for (const c of rest) {
+      const cat = coverCategory(c.name);
+      const key = cat ? cat.g : 'Other';
+      const icon = cat ? cat.i : '📋';
+      if (!groups.has(key)) groups.set(key, { icon, items: [] });
+      groups.get(key).items.push(c);
+    }
+
+    const pinnedHtml = pinned ? `
+      <div class="cover-pinned">
+        <div class="cover-pinned-icon">🕐</div>
+        <div class="cover-pinned-body">
+          <div class="cover-pinned-name">${escHtml(pinned.name)}</div>
+          ${pinned.description ? `<div class="cover-pinned-desc">${escHtml(pinned.description)}</div>` : ''}
+        </div>
+        <div class="cover-pinned-meta">
+          <div class="cover-pinned-limit">${fmtCoverLimit(pinned.limit)}</div>
+          <div class="cover-pinned-excess">${pinned.excess ? '£' + pinned.excess + ' excess' : 'Nil excess'}</div>
+        </div>
+      </div>` : '';
+
+    const groupsHtml = [...groups.entries()].map(([name, { icon, items }], idx) => `
+      <details class="cover-acc"${idx < 2 ? ' open' : ''}>
+        <summary>
+          <span class="acc-icon">${icon}</span>
+          <span class="acc-label">${escHtml(name)}</span>
+          <span class="acc-count">${items.length}</span>
+          <span class="acc-chevron">▾</span>
         </summary>
-        <table class="portal-cover-table">
-          <thead>
-            <tr>
-              <th>Benefit</th>
-              <th>Limit</th>
-              <th>Excess</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${coverSummary.map(c => `
-              <tr>
-                <td class="cover-name">${escHtml(c.name || '')}${c.description ? `<br><span style="font-size:11px;font-weight:400;color:var(--muted)">${escHtml(c.description)}</span>` : ''}</td>
-                <td class="cover-limit">${fmtCoverLimit(c.limit)}</td>
-                <td class="cover-excess">${c.excess ? '£' + c.excess : 'Nil'}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </details>`
-    : '';
+        <div class="acc-body-wrap"><div class="acc-body-inner">
+          <div class="cover-grid">${items.map(coverItemHtml).join('')}</div>
+        </div></div>
+      </details>`).join('');
+
+    coverSummaryHtml = `
+      <div class="portal-cover-card">
+        <div class="portal-section-title">Your cover summary</div>
+        ${pinnedHtml}
+        ${groupsHtml}
+      </div>`;
+  }
 
   document.getElementById('portal-reg-summary').innerHTML = `
     <div class="portal-summary-card">
@@ -3213,6 +3319,18 @@ async function portalDeleteFlight(flightId) {
     alert('Network error — please try again.');
   }
 }
+
+// Cover accordion smooth close
+document.addEventListener('click', e => {
+  const acc = e.target.closest('details.cover-acc');
+  if (!acc || !acc.open) return;
+  e.preventDefault();
+  acc.classList.add('closing');
+  acc.addEventListener('transitionend', () => {
+    acc.classList.remove('closing');
+    acc.removeAttribute('open');
+  }, { once: true });
+});
 </script>
 
 <!-- Return flight modal -->
