@@ -1629,8 +1629,8 @@ const state = {
   setDate('rt', tomorrowStr);
 
   if (portalRestoreSession()) {
+    // Show toggle only — pill shown once session is confirmed by the server in showPortalDash()
     document.getElementById('portal-toggle-btn').style.display = '';
-    document.getElementById('portal-logout-pill').style.display = '';
   }
 
   if (token && /^[0-9a-f]{64}$/i.test(token)) {
@@ -2701,8 +2701,10 @@ async function showPortalDash() {
     const data = await res.json();
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
-        // Token expired or invalid — clear it and show login form
+        // Token expired or invalid — clear session and hide header buttons
         portalClearSession();
+        document.getElementById('portal-toggle-btn').style.display = 'none';
+        document.getElementById('portal-logout-pill').style.display = 'none';
         document.getElementById('portal-dash').style.display = 'none';
         document.getElementById('portal-login').style.display = '';
         return;
@@ -2711,6 +2713,8 @@ async function showPortalDash() {
         `<div class="alert alert-error">${data.error}</div>`;
       return;
     }
+    // Session confirmed by server — safe to show the logout pill
+    document.getElementById('portal-logout-pill').style.display = '';
     renderPortalDash(data);
   } catch (err) {
     console.error('[portal] showPortalDash error:', err);
