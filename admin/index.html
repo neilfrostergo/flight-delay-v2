@@ -1191,6 +1191,8 @@ function logout(reason) {
   state.me = null;
   localStorage.removeItem('admin_token');
   idleTimer.stop();
+  // Close any open modals so they don't persist over the login screen
+  document.querySelectorAll('.modal-backdrop.open').forEach(el => el.classList.remove('open'));
   document.getElementById('app').classList.remove('visible');
   document.getElementById('auth-screen').style.display = '';
   if (reason === 'idle') {
