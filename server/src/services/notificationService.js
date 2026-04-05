@@ -512,6 +512,89 @@ async function sendDocumentUploadRequest(registration, flightReg, uploadUrl, ten
   );
 }
 
+// ── Admin account emails ──────────────────────────────────────────────────────
+
+function adminEmailHtml({ heading, bodyLines, ctaUrl, ctaLabel, expiryNote }) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1a1a2e;padding:24px 36px;">
+          <div style="font-size:20px;font-weight:800;color:#ffffff;">Flight Delay Admin</div>
+        </td></tr>
+        <tr><td style="padding:28px 36px 0;">
+          <div style="font-size:22px;font-weight:800;color:#1a1a2e;">${heading}</div>
+        </td></tr>
+        <tr><td style="padding:16px 36px 0;">
+          ${bodyLines.map(l => `<p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6;">${l}</p>`).join('')}
+        </td></tr>
+        <tr><td style="padding:24px 36px;">
+          <a href="${ctaUrl}" style="display:block;text-align:center;background:#1a56db;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 20px;border-radius:8px;">${ctaLabel}</a>
+        </td></tr>
+        <tr><td style="padding:0 36px 28px;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;">This link expires in ${expiryNote}. If you did not request this, you can ignore this email.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+async function sendAdminInvite({ username, email, setPasswordUrl }) {
+  const subject = 'You\'ve been invited to Flight Delay Admin — set your password';
+  const html = adminEmailHtml({
+    heading:    'Set up your admin account',
+    bodyLines:  [
+      `Hi ${username},`,
+      'You\'ve been added as an administrator on the Flight Delay platform. Click the button below to set your password and activate your account.',
+    ],
+    ctaUrl:     setPasswordUrl,
+    ctaLabel:   'Set my password',
+    expiryNote: '48 hours',
+  });
+
+  if (useAcs()) {
+    const client = new EmailClient(config.acs.connectionString);
+    await client.beginSend({
+      senderAddress: acsSenderDomain(),
+      recipients: { to: [{ address: email }] },
+      content: { subject, html },
+    });
+  } else {
+    const transporter = nodemailer.createTransport(config.smtp);
+    await transporter.sendMail({ from: smtpFromAddress(), to: email, subject, html });
+  }
+}
+
+async function sendAdminPasswordReset({ username, email, setPasswordUrl }) {
+  const subject = 'Reset your Flight Delay Admin password';
+  const html = adminEmailHtml({
+    heading:    'Password reset requested',
+    bodyLines:  [
+      `Hi ${username},`,
+      'A password reset was requested for your admin account. Click the button below to choose a new password.',
+    ],
+    ctaUrl:     setPasswordUrl,
+    ctaLabel:   'Reset my password',
+    expiryNote: '1 hour',
+  });
+
+  if (useAcs()) {
+    const client = new EmailClient(config.acs.connectionString);
+    await client.beginSend({
+      senderAddress: acsSenderDomain(),
+      recipients: { to: [{ address: email }] },
+      content: { subject, html },
+    });
+  } else {
+    const transporter = nodemailer.createTransport(config.smtp);
+    await transporter.sendMail({ from: smtpFromAddress(), to: email, subject, html });
+  }
+}
+
 module.exports = {
   sendRegistrationConfirmation,
   sendPayoutNotification,
@@ -519,4 +602,6 @@ module.exports = {
   sendSingleTripOutreach,
   sendReturnTripOutreach,
   sendAnnualMultiTripOutreach,
+  sendAdminInvite,
+  sendAdminPasswordReset,
 };

@@ -244,7 +244,8 @@
      AUTH SCREEN
 ════════════════════════════════════════════════════ -->
 <div id="auth-screen">
-  <div class="card">
+  <!-- Login form -->
+  <div class="card" id="login-card">
     <h1>Admin Portal</h1>
     <p>Flight Delay Platform</p>
     <div id="auth-error" class="alert alert-error" style="display:none"></div>
@@ -257,6 +258,22 @@
       <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" />
     </div>
     <button class="btn btn-primary" style="width:100%" id="login-btn" onclick="doLogin()">Sign in</button>
+  </div>
+  <!-- Set / reset password form (shown when ?set_password_token= is in URL) -->
+  <div class="card" id="set-password-card" style="display:none">
+    <h1 id="set-pw-heading">Set your password</h1>
+    <p id="set-pw-subheading">Choose a password for your admin account.</p>
+    <div id="set-pw-error" class="alert alert-error" style="display:none"></div>
+    <div id="set-pw-success" class="alert alert-success" style="display:none"></div>
+    <div class="form-group">
+      <label>New Password</label>
+      <input id="set-pw-new" type="password" autocomplete="new-password" placeholder="Min 8 characters" />
+    </div>
+    <div class="form-group">
+      <label>Confirm Password</label>
+      <input id="set-pw-confirm" type="password" autocomplete="new-password" placeholder="Repeat password" />
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="doSetPassword()">Set Password &amp; Sign In</button>
   </div>
 </div>
 
@@ -1029,9 +1046,10 @@
         <select id="um-tenant"><option value="">— select —</option></select>
       </div>
     </div>
-    <div class="form-group" id="um-password-group">
-      <label>Password *</label>
-      <input id="um-password" type="password" placeholder="Min 8 characters" autocomplete="new-password" />
+    <div class="form-group" id="um-password-group" style="display:none">
+      <p style="margin:0;padding:10px 14px;background:#f0f4ff;border-radius:6px;font-size:13px;color:#374151">
+        An invite email will be sent to the address above with a link to set their password.
+      </p>
     </div>
     <div class="form-group" id="um-active-group" style="display:none">
       <label><input type="checkbox" id="um-active" style="width:auto;margin-right:6px" /> Active</label>
@@ -1045,18 +1063,16 @@
 
 <!-- Reset Password Modal -->
 <div class="modal-backdrop" id="modal-reset-pw">
-  <div class="modal" style="width:380px">
-    <h3>Reset Password</h3>
-    <p id="reset-pw-for" style="font-size:13px;color:var(--muted);margin-bottom:12px"></p>
+  <div class="modal" style="width:400px">
+    <h3>Send Password Reset</h3>
+    <p id="reset-pw-for" style="font-size:14px;color:var(--muted);margin-bottom:16px"></p>
     <div id="reset-pw-error" class="alert alert-error" style="display:none"></div>
+    <div id="reset-pw-success" class="alert alert-success" style="display:none"></div>
     <input type="hidden" id="rp-user-id" />
-    <div class="form-group">
-      <label>New Password *</label>
-      <input id="rp-password" type="password" placeholder="Min 8 characters" autocomplete="new-password" />
-    </div>
+    <p style="font-size:13px;color:#374151;margin:0 0 16px">A password reset link will be emailed to the user. The link expires after 1 hour.</p>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-reset-pw')">Cancel</button>
-      <button class="btn btn-danger" onclick="doResetPassword()">Reset Password</button>
+      <button class="btn btn-danger" onclick="doResetPassword()">Send Reset Email</button>
     </div>
   </div>
 </div>
@@ -2402,7 +2418,7 @@ async function changePassword() {
   if (newPwd !== confirm) { errEl.textContent = 'New passwords do not match'; errEl.style.display = ''; return; }
   if (newPwd.length < 8)  { errEl.textContent = 'Password must be at least 8 characters'; errEl.style.display = ''; return; }
 
-  const res = await POST('/api/admin/auth/change-password', { currentPassword: current, newPassword: newPwd });
+  const res = await POST('/api/admin/auth/change-password', { current_password: current, new_password: newPwd, confirm_password: confirm });
   if (!res?.ok) { errEl.textContent = res?.data?.error || 'Failed to change password'; errEl.style.display = ''; return; }
 
   sucEl.textContent = 'Password changed.'; sucEl.style.display = '';
@@ -2462,10 +2478,59 @@ function paymentBadge(s) {
 // INIT
 // ═══════════════════════════════════════════════════════════
 (async function init() {
+  // If the URL contains a password-set token, show the set-password screen instead of login
+  const urlParams = new URLSearchParams(location.search);
+  const setPwToken = urlParams.get('set_password_token');
+  if (setPwToken) {
+    document.getElementById('login-card').style.display = 'none';
+    document.getElementById('set-password-card').style.display = '';
+    // Store token for use when the form is submitted
+    document.getElementById('set-password-card').dataset.token = setPwToken;
+    // Clean token from URL bar without reloading
+    history.replaceState({}, '', location.pathname);
+    return;
+  }
+
   if (state.token) {
     await initApp();
   }
 })();
+
+async function doSetPassword() {
+  const card     = document.getElementById('set-password-card');
+  const token    = card.dataset.token;
+  const newPwd   = document.getElementById('set-pw-new').value;
+  const confirm  = document.getElementById('set-pw-confirm').value;
+  const errEl    = document.getElementById('set-pw-error');
+  const sucEl    = document.getElementById('set-pw-success');
+  errEl.style.display = 'none'; sucEl.style.display = 'none';
+
+  if (newPwd.length < 8) { errEl.textContent = 'Password must be at least 8 characters'; errEl.style.display = ''; return; }
+  if (newPwd !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.style.display = ''; return; }
+
+  const res = await fetch('/api/admin/auth/set-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password: newPwd, confirm_password: confirm }),
+  }).then(r => r.json().then(d => ({ ok: r.ok, data: d }))).catch(() => null);
+
+  if (!res?.ok) {
+    errEl.textContent = res?.data?.error || 'Failed to set password';
+    errEl.style.display = '';
+    return;
+  }
+
+  // Auto-login with the returned JWT
+  state.token = res.data.token;
+  localStorage.setItem('admin_token', state.token);
+  sucEl.textContent = 'Password set! Signing you in…';
+  sucEl.style.display = '';
+  setTimeout(async () => {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    await initApp();
+  }, 800);
+}
 
 // ═══════════════════════════════════════════════════════════
 // ADMIN USERS
@@ -2498,7 +2563,7 @@ async function loadUsers() {
       <td><span class="status-badge ${u.is_active ? 'active' : 'inactive'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
       <td>
         <button class="btn btn-outline btn-xs" onclick="openUserModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">Edit</button>
-        <button class="btn btn-outline btn-xs" onclick="openResetPassword(${u.id},'${esc(u.username)}')">Reset PW</button>
+        <button class="btn btn-outline btn-xs" onclick="openResetPassword(${u.id},'${esc(u.username)}','${esc(u.email)}')">Reset PW</button>
         <button class="btn btn-danger btn-xs" onclick="deleteUser(${u.id},'${esc(u.username)}')">Delete</button>
       </td>
     </tr>`).join('');
@@ -2512,7 +2577,7 @@ async function openUserModal(user) {
   document.getElementById('um-username').value = user?.username || '';
   document.getElementById('um-email').value    = user?.email || '';
   document.getElementById('um-role').value     = user?.role || 'admin';
-  document.getElementById('um-password-group').style.display = user ? 'none' : '';
+  document.getElementById('um-password-group').style.display = user ? 'none' : 'block';
   document.getElementById('um-active-group').style.display   = user ? '' : 'none';
   if (user) document.getElementById('um-active').checked = user.is_active;
 
@@ -2542,7 +2607,6 @@ async function saveUser() {
   };
 
   if (!id) {
-    body.password  = document.getElementById('um-password').value;
     const tenantEl = document.getElementById('um-tenant');
     if (document.getElementById('um-tenant-group').style.display !== 'none') {
       body.tenant_id = tenantEl.value || null;
@@ -2560,31 +2624,45 @@ async function saveUser() {
     errEl.style.display = 'block';
     return;
   }
+  if (!id && res.data?.invite_sent) {
+    errEl.style.display = 'none';
+    errEl.className = 'alert alert-success';
+    errEl.textContent = `Account created. An invite email has been sent to ${body.email}.`;
+    errEl.style.display = 'block';
+    // Reset form fields but leave modal open briefly so user sees the message
+    document.getElementById('um-username').value = '';
+    document.getElementById('um-email').value = '';
+    document.getElementById('um-id').value = '';
+    setTimeout(() => { errEl.className = 'alert alert-error'; closeModal('modal-user'); loadUsers(); }, 2500);
+    return;
+  }
   closeModal('modal-user');
   loadUsers();
 }
 
-function openResetPassword(userId, username) {
-  document.getElementById('rp-user-id').value  = userId;
-  document.getElementById('rp-password').value = '';
-  document.getElementById('reset-pw-for').textContent = `User: ${username}`;
+function openResetPassword(userId, username, email) {
+  document.getElementById('rp-user-id').value = userId;
+  document.getElementById('reset-pw-for').textContent = `${username} (${email})`;
   document.getElementById('reset-pw-error').style.display = 'none';
+  document.getElementById('reset-pw-success').style.display = 'none';
   openModal('modal-reset-pw');
 }
 
 async function doResetPassword() {
   const userId = document.getElementById('rp-user-id').value;
-  const pw     = document.getElementById('rp-password').value;
   const errEl  = document.getElementById('reset-pw-error');
-  errEl.style.display = 'none';
+  const sucEl  = document.getElementById('reset-pw-success');
+  errEl.style.display = 'none'; sucEl.style.display = 'none';
 
-  const res = await api('POST', `/api/admin/users/${userId}/reset-password`, { new_password: pw });
-  if (!res.ok) {
-    errEl.textContent   = res.data?.error || 'Reset failed';
+  const res = await api('POST', `/api/admin/users/${userId}/reset-password`, {});
+  if (!res?.ok) {
+    errEl.textContent = res?.data?.error || 'Failed to send reset email';
     errEl.style.display = 'block';
     return;
   }
-  closeModal('modal-reset-pw');
+  sucEl.textContent = 'Reset email sent.';
+  sucEl.style.display = 'block';
+  setTimeout(() => closeModal('modal-reset-pw'), 1500);
 }
 
 async function deleteUser(userId, username) {

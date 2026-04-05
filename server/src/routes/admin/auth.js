@@ -10,6 +10,61 @@ const { requireAdmin } = require('../../middleware/requireAdmin');
 const router = express.Router();
 const SALT_ROUNDS = 12;
 
+// POST /api/admin/auth/set-password  — public endpoint; consumes a one-time invite/reset token
+router.post('/set-password', async (req, res) => {
+  const { token, new_password, confirm_password } = req.body || {};
+
+  if (!token || !new_password || !confirm_password) {
+    return res.status(400).json({ error: 'token, new_password and confirm_password are required' });
+  }
+  if (new_password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  if (new_password !== confirm_password) {
+    return res.status(400).json({ error: 'Passwords do not match' });
+  }
+
+  const result = await query(
+    `SELECT t.id, t.user_id, t.purpose, t.expires_at, t.used_at,
+            u.username, u.email, u.role, u.tenant_id, u.is_active
+     FROM admin_password_tokens t
+     JOIN admin_users u ON u.id = t.user_id
+     WHERE t.token = $1`,
+    [String(token)]
+  );
+
+  const row = result.rows[0];
+  if (!row)          return res.status(422).json({ error: 'Invalid or expired link' });
+  if (row.used_at)   return res.status(422).json({ error: 'This link has already been used' });
+  if (new Date(row.expires_at) < new Date()) return res.status(422).json({ error: 'This link has expired' });
+
+  const hash = await bcrypt.hash(new_password, SALT_ROUNDS);
+
+  // Set password, activate account (in case it was an invite), mark token used
+  await query(
+    `UPDATE admin_users SET password_hash = $1, is_active = TRUE WHERE id = $2`,
+    [hash, row.user_id]
+  );
+  await query(
+    `UPDATE admin_password_tokens SET used_at = NOW() WHERE id = $1`,
+    [row.id]
+  );
+
+  // Auto-login: return a JWT so the admin lands straight on the dashboard
+  await query('UPDATE admin_users SET last_login_at = NOW() WHERE id = $1', [row.user_id]);
+  const jwtToken = jwt.sign(
+    { sub: row.user_id, username: row.username, role: row.role, tenant_id: row.tenant_id },
+    config.jwt.secret,
+    { expiresIn: config.jwt.expiresIn }
+  );
+
+  return res.json({
+    ok: true,
+    token: jwtToken,
+    user: { id: row.user_id, username: row.username, email: row.email, role: row.role, tenantId: row.tenant_id },
+  });
+});
+
 // POST /api/admin/auth/login
 router.post('/login', async (req, res) => {
   const { username, password } = req.body || {};
@@ -70,12 +125,15 @@ router.get('/me', requireAdmin, async (req, res) => {
 
 // POST /api/admin/auth/change-password
 router.post('/change-password', requireAdmin, async (req, res) => {
-  const { current_password, new_password } = req.body || {};
-  if (!current_password || !new_password) {
-    return res.status(400).json({ error: 'current_password and new_password required' });
+  const { current_password, new_password, confirm_password } = req.body || {};
+  if (!current_password || !new_password || !confirm_password) {
+    return res.status(400).json({ error: 'current_password, new_password and confirm_password are required' });
   }
   if (new_password.length < 8) {
     return res.status(400).json({ error: 'new_password must be at least 8 characters' });
+  }
+  if (new_password !== confirm_password) {
+    return res.status(400).json({ error: 'Passwords do not match' });
   }
 
   const result = await query('SELECT password_hash FROM admin_users WHERE id = $1', [req.admin.sub]);

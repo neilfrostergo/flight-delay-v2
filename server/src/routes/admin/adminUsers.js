@@ -1,12 +1,22 @@
 'use strict';
 
 const express = require('express');
-const bcrypt  = require('bcryptjs');
+const crypto  = require('crypto');
 const { query } = require('../../db/connection');
 const { adminTenantScope } = require('../../middleware/requireAdmin');
+const { sendAdminInvite, sendAdminPasswordReset } = require('../../services/notificationService');
+const config = require('../../config');
 
 const router = express.Router();
-const SALT_ROUNDS = 12;
+
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex'); // 64-char hex
+}
+
+function adminBaseUrl() {
+  // Use ADMIN_CORS_ORIGIN as the base — it's already the admin app's origin
+  return config.cors.adminOrigin || 'http://localhost:3000';
+}
 
 // Scope helper — superadmin can specify a tenant_id; tenant admin is locked to their own
 function effectiveTenantId(req, bodyTenantId) {
@@ -30,15 +40,12 @@ router.get('/', async (req, res) => {
   return res.json(result.rows);
 });
 
-// POST /api/admin/users — create an admin user
+// POST /api/admin/users — create an admin user and send an invite email
 router.post('/', async (req, res) => {
-  const { username, email, password, role = 'admin', tenant_id } = req.body || {};
+  const { username, email, role = 'admin', tenant_id } = req.body || {};
 
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'username, email and password are required' });
-  }
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (!username || !email) {
+    return res.status(400).json({ error: 'username and email are required' });
   }
   if (!['admin', 'readonly'].includes(role)) {
     return res.status(400).json({ error: 'role must be admin or readonly' });
@@ -46,26 +53,46 @@ router.post('/', async (req, res) => {
 
   const assignedTenantId = effectiveTenantId(req, tenant_id ? parseInt(tenant_id, 10) : null);
 
-  // Tenant admins must create users for their own tenant
   if (req.admin.role !== 'superadmin' && assignedTenantId !== req.admin.tenant_id) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const hash = await bcrypt.hash(password, SALT_ROUNDS);
+  // Create account with a placeholder password hash — cannot be used until set via token
+  const placeholderHash = '!unset';
 
+  let newUser;
   try {
     const result = await query(
-      `INSERT INTO admin_users (tenant_id, username, email, password_hash, role)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO admin_users (tenant_id, username, email, password_hash, role, is_active)
+       VALUES ($1, $2, $3, $4, $5, FALSE)
        RETURNING id, tenant_id, username, email, role, is_active, created_at`,
-      [assignedTenantId, username.trim(), email.trim().toLowerCase(), hash, role]
+      [assignedTenantId, username.trim(), email.trim().toLowerCase(), placeholderHash, role]
     );
-    return res.status(201).json(result.rows[0]);
+    newUser = result.rows[0];
   } catch (err) {
     if (err.constraint === 'admin_users_username_key') return res.status(409).json({ error: 'Username already taken' });
     if (err.constraint === 'admin_users_email_key')    return res.status(409).json({ error: 'Email already registered' });
     throw err;
   }
+
+  // Generate a 48-hour invite token and send the email
+  const token    = generateToken();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+  await query(
+    `INSERT INTO admin_password_tokens (user_id, token, purpose, expires_at)
+     VALUES ($1, $2, 'invite', $3)`,
+    [newUser.id, token, expiresAt]
+  );
+
+  const setPasswordUrl = `${adminBaseUrl()}/admin?set_password_token=${token}`;
+  try {
+    await sendAdminInvite({ username: newUser.username, email: newUser.email, setPasswordUrl });
+  } catch (emailErr) {
+    console.error('[adminUsers] Failed to send invite email:', emailErr.message);
+    // Don't fail the request — admin can resend
+  }
+
+  return res.status(201).json({ ...newUser, invite_sent: true });
 });
 
 // PATCH /api/admin/users/:id — update username / email / role / is_active
@@ -115,17 +142,15 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// POST /api/admin/users/:id/reset-password
+// POST /api/admin/users/:id/reset-password — send a password-reset email (no password accepted here)
 router.post('/:id/reset-password', async (req, res) => {
   const userId = parseInt(req.params.id, 10);
   if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
 
-  const { new_password } = req.body || {};
-  if (!new_password || new_password.length < 8) {
-    return res.status(400).json({ error: 'new_password must be at least 8 characters' });
-  }
-
-  const existing = await query('SELECT id, tenant_id, role FROM admin_users WHERE id = $1', [userId]);
+  const existing = await query(
+    'SELECT id, tenant_id, username, email, role FROM admin_users WHERE id = $1',
+    [userId]
+  );
   if (existing.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
   const target = existing.rows[0];
@@ -135,8 +160,29 @@ router.post('/:id/reset-password', async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const hash = await bcrypt.hash(new_password, SALT_ROUNDS);
-  await query('UPDATE admin_users SET password_hash = $1 WHERE id = $2', [hash, userId]);
+  // Expire any existing unused tokens for this user
+  await query(
+    `UPDATE admin_password_tokens SET expires_at = NOW()
+     WHERE user_id = $1 AND used_at IS NULL`,
+    [userId]
+  );
+
+  const token     = generateToken();
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  await query(
+    `INSERT INTO admin_password_tokens (user_id, token, purpose, expires_at)
+     VALUES ($1, $2, 'reset', $3)`,
+    [userId, token, expiresAt]
+  );
+
+  const setPasswordUrl = `${adminBaseUrl()}/admin?set_password_token=${token}`;
+  try {
+    await sendAdminPasswordReset({ username: target.username, email: target.email, setPasswordUrl });
+  } catch (emailErr) {
+    console.error('[adminUsers] Failed to send reset email:', emailErr.message);
+    return res.status(500).json({ error: 'Failed to send reset email' });
+  }
+
   return res.json({ ok: true });
 });
 
