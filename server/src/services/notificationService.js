@@ -31,7 +31,7 @@ function useAcs() {
 function acsFromAddress() {
   // ACS requires a sender address from the provisioned domain.
   // Falls back to the default Azure-managed domain sender if not explicitly set.
-  return config.acs.senderAddress || 'DoNotReply@0085c80a-43b3-4c65-a155-083341647f6b.azurecomm.net';
+  return config.acs.senderAddress || 'donotreply@delayedpaid.co.uk';
 }
 
 function smtpFromAddress() {
