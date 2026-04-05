@@ -177,6 +177,17 @@
     .filters label { font-size: 11px; }
     .filters input, .filters select { padding: 6px 10px; font-size: 13px; }
 
+    /* Document review split pane */
+    .doc-split { display: flex; gap: 16px; align-items: flex-start; }
+    .doc-list-pane { flex: 0 0 55%; min-width: 0; overflow-x: auto; }
+    .doc-preview-pane { flex: 1; min-width: 0; position: sticky; top: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); display: flex; flex-direction: column; overflow: hidden; }
+    .doc-preview-pane.empty { align-items: center; justify-content: center; min-height: 300px; color: var(--muted); font-size: 14px; }
+    .doc-preview-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--card-bg); flex-shrink: 0; }
+    .doc-preview-header .doc-name { flex: 1; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-preview-frame { width: 100%; flex: 1; min-height: 500px; border: none; display: block; background: #fff; }
+    .doc-row-selected { background: color-mix(in srgb, var(--brand) 8%, transparent) !important; }
+    .doc-row-selected td { background: transparent !important; }
+
     /* Detail layout */
     .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .detail-field { margin-bottom: 12px; }
@@ -568,8 +579,7 @@
           <h2>Document Review Queue</h2>
         </div>
         <div style="margin-bottom:12px;font-size:13px;color:var(--muted)">
-          Documents flagged for manual review — AI could not confirm authenticity, or the document did not match the registered flight.
-          Approving a document will release any held payment.
+          Click a row to preview the document. Approving releases any held payment.
         </div>
         <div class="filters">
           <div class="form-group"><label>Status</label>
@@ -582,15 +592,22 @@
             </select>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>Uploaded</th><th>Tenant</th><th>Policy</th><th>Customer</th><th>Flight</th><th>File</th><th>Status</th><th>AI Result</th><th>Actions</th>
-            </tr></thead>
-            <tbody id="doc-body"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
-          </table>
+        <div class="doc-split">
+          <div class="doc-list-pane">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Uploaded</th><th>Policy</th><th>Customer</th><th>Flight</th><th>Status</th><th>AI Result</th>
+                </tr></thead>
+                <tbody id="doc-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="doc-pagination"></div>
+          </div>
+          <div class="doc-preview-pane empty" id="doc-preview-pane">
+            <span>Select a document to preview</span>
+          </div>
         </div>
-        <div class="pagination" id="doc-pagination"></div>
       </div>
 
       <!-- ── Simulator ──────────────────────────────── -->
@@ -2021,6 +2038,8 @@ async function revokeToken(id) {
 
 // ── Documents review queue ──────────────────────────────────────────────────
 let docPage = 1;
+let docSelectedId = null;
+let docPreviewObjectUrl = null;
 
 const DOC_STATUS_LABELS = {
   pending_ai:    { label: 'AI unavailable', cls: 'badge-yellow' },
@@ -2037,7 +2056,7 @@ async function loadDocuments(page = 1) {
 
   const res   = await GET(`/api/admin/documents?${params}`);
   const tbody = document.getElementById('doc-body');
-  if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="9" class="empty">Failed to load</td></tr>'; return; }
+  if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Failed to load</td></tr>'; return; }
 
   const { total, documents } = res.data;
 
@@ -2047,46 +2066,100 @@ async function loadDocuments(page = 1) {
   else badge.style.display = 'none';
 
   if (!documents.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">No documents awaiting review</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No documents awaiting review</td></tr>';
     renderPagination('doc-pagination', 0, 50, page, loadDocuments);
+    clearDocPreview();
     return;
   }
 
   tbody.innerHTML = documents.map(d => {
     const st   = DOC_STATUS_LABELS[d.match_status] || { label: d.match_status, cls: 'badge-gray' };
     const aiCell = d.ai_genuine !== null && d.ai_genuine !== undefined
-      ? `<span class="badge ${d.ai_genuine ? 'badge-green' : 'badge-red'}" title="${esc(d.ai_reason || '')}">${d.ai_genuine ? 'Genuine' : 'Suspect'} (${d.ai_confidence || '?'})</span>`
+      ? `<span class="badge ${d.ai_genuine ? 'badge-green' : 'badge-red'}" title="${esc(d.ai_reason || '')}">${d.ai_genuine ? 'Genuine' : 'Suspect'}</span>`
       : '<span class="text-muted">–</span>';
     const flightCell = d.flight_number
-      ? `${d.flight_number} ${d.dep_date ? String(d.dep_date).slice(0, 10) : ''}`
+      ? `${d.flight_number}<br><small class="text-muted">${d.dep_date ? String(d.dep_date).slice(0, 10) : ''}</small>`
       : '<span class="text-muted">–</span>';
-    const awaitingPayment = d.flight_status === 'awaiting_document' && d.pending_flight_event_id;
+    const selected = d.id === docSelectedId ? ' class="doc-row-selected"' : '';
 
-    return `<tr>
+    return `<tr${selected} style="cursor:pointer" onclick="previewDocument(${d.id},'${esc(d.original_name)}','${esc(d.mime_type || '')}',${!!d.pending_flight_event_id && d.flight_status==='awaiting_document'})">
       <td class="text-muted"><small>${fmtDateTime(d.uploaded_at)}</small></td>
-      <td><small>${esc(d.tenant_name)}</small></td>
-      <td class="mono"><small>${esc(d.policy_number)}</small></td>
-      <td><small>${esc(d.first_name || '')} ${esc(d.last_name || '')}<br><span class="text-muted">${esc(d.email)}</span></small></td>
+      <td class="mono"><small>${esc(d.policy_number)}<br><span class="text-muted">${esc(d.first_name || '')} ${esc(d.last_name || '')}</span></small></td>
+      <td><small>${esc(d.email)}</small></td>
       <td class="mono"><small>${flightCell}</small></td>
-      <td><small>${esc(d.original_name)}<br><span class="text-muted">${d.file_size_bytes ? (d.file_size_bytes / 1024).toFixed(0) + ' KB' : ''}</span></small></td>
-      <td><span class="badge ${st.cls}">${st.label}</span>${awaitingPayment ? '<br><small class="text-muted">payment held</small>' : ''}</td>
-      <td style="max-width:220px"><small>${aiCell}${d.ai_reason ? `<br><span class="text-muted">${esc(d.ai_reason)}</span>` : ''}</small></td>
-      <td style="display:flex;gap:4px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-sm" onclick="reviewDocument(${d.id},'approve')">Approve</button>
-        <button class="btn btn-danger btn-sm"  onclick="reviewDocument(${d.id},'reject')">Reject</button>
-      </td>
+      <td><span class="badge ${st.cls}">${st.label}</span></td>
+      <td>${aiCell}</td>
     </tr>`;
   }).join('');
 
   renderPagination('doc-pagination', total, 50, page, loadDocuments);
 }
 
+function clearDocPreview() {
+  if (docPreviewObjectUrl) { URL.revokeObjectURL(docPreviewObjectUrl); docPreviewObjectUrl = null; }
+  const pane = document.getElementById('doc-preview-pane');
+  pane.className = 'doc-preview-pane empty';
+  pane.innerHTML = '<span>Select a document to preview</span>';
+  docSelectedId = null;
+}
+
+async function previewDocument(id, name, mime, awaitingPayment) {
+  docSelectedId = id;
+
+  // Highlight row
+  document.querySelectorAll('#doc-body tr').forEach(tr => tr.classList.remove('doc-row-selected'));
+  event.currentTarget.classList.add('doc-row-selected');
+
+  const pane = document.getElementById('doc-preview-pane');
+  pane.className = 'doc-preview-pane';
+  pane.innerHTML = `
+    <div class="doc-preview-header">
+      <span class="doc-name" title="${esc(name)}">${esc(name)}</span>
+      ${awaitingPayment ? '<span class="badge badge-yellow" style="flex-shrink:0">payment held</span>' : ''}
+      <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="reviewDocument(${id},'approve')">Approve</button>
+      <button class="btn btn-danger btn-sm"  style="flex-shrink:0" onclick="reviewDocument(${id},'reject')">Reject</button>
+    </div>
+    <div id="doc-preview-body" style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:#f8f8f8">
+      <div class="spinner"></div>
+    </div>`;
+
+  // Revoke any previous object URL
+  if (docPreviewObjectUrl) { URL.revokeObjectURL(docPreviewObjectUrl); docPreviewObjectUrl = null; }
+
+  try {
+    const headers = {};
+    if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+    const response = await fetch(`/api/admin/documents/${id}/content`, { headers });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const blobData = await response.blob();
+    docPreviewObjectUrl = URL.createObjectURL(blobData);
+
+    const body = document.getElementById('doc-preview-body');
+    if (!body) return; // user navigated away
+    body.style.padding = '0';
+
+    if (mime.startsWith('image/')) {
+      body.innerHTML = `<img src="${docPreviewObjectUrl}" style="max-width:100%;max-height:70vh;display:block;margin:auto;object-fit:contain;padding:12px" />`;
+    } else {
+      body.innerHTML = `<iframe src="${docPreviewObjectUrl}" class="doc-preview-frame" title="${esc(name)}"></iframe>`;
+    }
+  } catch (err) {
+    const body = document.getElementById('doc-preview-body');
+    if (body) body.innerHTML = `<span style="color:var(--muted)">Could not load document: ${esc(err.message)}</span>`;
+  }
+}
+
 async function reviewDocument(id, action) {
   const label = action === 'approve' ? 'approve this document (this may trigger a payment)' : 'reject this document';
   if (!confirm(`Are you sure you want to ${label}?`)) return;
   const res = await PATCH(`/api/admin/documents/${id}`, { action });
-  if (res?.ok) loadDocuments(docPage);
-  else alert(res?.data?.error || 'Action failed');
+  if (res?.ok) {
+    clearDocPreview();
+    loadDocuments(docPage);
+  } else {
+    alert(res?.data?.error || 'Action failed');
+  }
 }
 
 async function importTokenCsv(input) {

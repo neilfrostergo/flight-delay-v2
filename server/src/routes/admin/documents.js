@@ -1,9 +1,14 @@
 'use strict';
 
 const express = require('express');
+const fs      = require('fs');
+const path    = require('path');
 const { query } = require('../../db/connection');
 const { adminTenantScope } = require('../../middleware/requireAdmin');
 const { triggerDeferredPayment } = require('../../services/delayProcessor');
+const blob = require('../../services/blobStorage');
+
+const UPLOADS_DIR = path.join(__dirname, '..', '..', '..', 'uploads');
 
 const router = express.Router();
 
@@ -132,6 +137,51 @@ router.patch('/:id', async (req, res) => {
   }
 
   return res.json({ ok: true, match_status: newStatus });
+});
+
+// GET /api/admin/documents/:id/content — serve the raw file for inline preview
+router.get('/:id/content', async (req, res) => {
+  const scope = adminTenantScope(req);
+  const docId = parseInt(req.params.id, 10);
+
+  const params = [docId];
+  const tenantClause = scope !== null ? `AND d.tenant_id = $2` : '';
+  if (scope !== null) params.push(scope);
+
+  const result = await query(
+    `SELECT d.registration_id, d.stored_name, d.mime_type
+     FROM registration_documents d
+     WHERE d.id = $1 ${tenantClause}`,
+    params
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
+
+  const { registration_id, stored_name, mime_type } = result.rows[0];
+  const contentType = mime_type || 'application/octet-stream';
+
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', 'inline');
+
+  if (blob.isAvailable()) {
+    try {
+      const blobKey = blob.blobName(registration_id, stored_name);
+      const buffer  = await blob.downloadToBuffer(blobKey);
+      return res.send(buffer);
+    } catch (err) {
+      console.error('[admin/documents] blob download error:', err.message);
+      return res.status(502).json({ error: 'Could not retrieve document' });
+    }
+  } else {
+    // Local dev — file on disk
+    const filePath = path.join(UPLOADS_DIR, String(registration_id), stored_name);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on disk' });
+    }
+    return res.sendFile(filePath);
+  }
 });
 
 module.exports = router;
