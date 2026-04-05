@@ -44,6 +44,15 @@ router.post('/', async (req, res) => {
     return res.status(422).json({ error: 'This token has expired' });
   }
 
+  // Record click analytics — clicked_at on first visit, last_clicked_at on every visit
+  await query(
+    `UPDATE pre_validation_tokens
+     SET clicked_at      = COALESCE(clicked_at, NOW()),
+         last_clicked_at = NOW()
+     WHERE id = $1`,
+    [tokenRow.id]
+  );
+
   // Validate the policy (using the email + policy number stored in the token)
   const result = await validatePolicy(req.tenant, tokenRow.policy_number, tokenRow.email);
 

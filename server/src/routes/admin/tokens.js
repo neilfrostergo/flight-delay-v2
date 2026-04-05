@@ -40,6 +40,7 @@ router.get('/', async (req, res) => {
   const result = await query(
     `SELECT t.id, t.tenant_id, tn.name AS tenant_name, t.policy_number, t.email,
             t.expires_at, t.used_at, t.registration_id, t.created_at,
+            t.clicked_at, t.last_clicked_at,
             au.username AS created_by_username
      FROM pre_validation_tokens t
      JOIN tenants tn ON tn.id = t.tenant_id
@@ -257,6 +258,37 @@ router.post('/import', upload.single('csv'), async (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="tokens-${Date.now()}.csv"`);
   res.send(csvHeader + csvRows);
+});
+
+// GET /api/admin/tokens/funnel — funnel stats for the token campaign
+router.get('/funnel', async (req, res) => {
+  const scope = adminTenantScope(req);
+  const tenantClause = scope !== null ? 'WHERE tenant_id = $1' : '';
+  const params = scope !== null ? [scope] : [];
+
+  const result = await query(
+    `SELECT
+       COUNT(*)                                         AS total_issued,
+       COUNT(clicked_at)                               AS clicked,
+       COUNT(registration_id)                          AS registered,
+       COUNT(CASE WHEN r.id IS NOT NULL
+                   AND EXISTS (
+                     SELECT 1 FROM flight_registrations fr
+                     WHERE fr.registration_id = r.id AND fr.status = 'paid'
+                   ) THEN 1 END)                       AS paid
+     FROM pre_validation_tokens t
+     LEFT JOIN registrations r ON r.id = t.registration_id
+     ${tenantClause}`,
+    params
+  );
+
+  const row = result.rows[0];
+  return res.json({
+    total_issued: parseInt(row.total_issued, 10),
+    clicked:      parseInt(row.clicked, 10),
+    registered:   parseInt(row.registered, 10),
+    paid:         parseInt(row.paid, 10),
+  });
 });
 
 // DELETE /api/admin/tokens/:id — revoke (expire immediately)

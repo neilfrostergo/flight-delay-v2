@@ -534,6 +534,7 @@
           <input type="file" id="csv-import-input" accept=".csv,text/csv" style="display:none" onchange="importTokenCsv(this)">
         </div>
         <div id="csv-import-banner" style="display:none;margin-bottom:12px"></div>
+        <div id="tok-funnel" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
         <div style="margin-bottom:12px;font-size:13px;color:var(--muted)">
           Import CSV format: <code>policy_number,email,first_name</code> — first_name is optional.
           A download with token URLs is returned automatically.
@@ -550,9 +551,9 @@
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Policy</th><th>Email</th><th>Expires</th><th>Used</th><th>Created By</th><th>Token URL</th><th>Actions</th>
+              <th>Policy</th><th>Email</th><th>Clicked</th><th>Expires</th><th>Used</th><th>Created By</th><th>Token URL</th><th>Actions</th>
             </tr></thead>
-            <tbody id="tok-body"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+            <tbody id="tok-body"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
           </table>
         </div>
         <div class="pagination" id="tok-pagination"></div>
@@ -1192,7 +1193,7 @@ function nav(page) {
     registrations: () => loadRegistrations(1),
     flights:      () => loadFlights(1),
     payments:     () => loadPayments(1),
-    tokens:       () => loadTokens(1),
+    tokens:       () => { loadTokenFunnel(); loadTokens(1); },
     simulator:    loadSimulator,
     settings:     loadSettings,
     users:        loadUsers,
@@ -1838,6 +1839,23 @@ async function retryPayment(id) {
 // ═══════════════════════════════════════════════════════════
 let tokPage = 1;
 
+async function loadTokenFunnel() {
+  const res = await GET('/api/admin/tokens/funnel');
+  const el = document.getElementById('tok-funnel');
+  if (!res?.ok) { el.innerHTML = ''; return; }
+  const { total_issued, clicked, registered, paid } = res.data;
+  const pct = (n, d) => d > 0 ? ` (${Math.round(n / d * 100)}%)` : '';
+  el.innerHTML = [
+    { label: 'Issued',     value: total_issued, cls: 'badge-blue'  },
+    { label: 'Clicked',    value: clicked,      cls: 'badge-purple', pct: pct(clicked, total_issued) },
+    { label: 'Registered', value: registered,   cls: 'badge-yellow', pct: pct(registered, clicked || total_issued) },
+    { label: 'Paid',       value: paid,         cls: 'badge-green',  pct: pct(paid, registered || 1) },
+  ].map(s => `<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:110px">
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${s.label}</div>
+    <div style="font-size:22px;font-weight:700;line-height:1.3">${s.value}<span style="font-size:12px;font-weight:400;color:var(--muted)">${s.pct||''}</span></div>
+  </div>`).join('<div style="align-self:center;color:var(--muted);font-size:18px">→</div>');
+}
+
 async function loadTokens(page = 1) {
   tokPage = page;
   const params = new URLSearchParams({
@@ -1847,10 +1865,10 @@ async function loadTokens(page = 1) {
 
   const res = await GET(`/api/admin/tokens?${params}`);
   const tbody = document.getElementById('tok-body');
-  if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Failed to load</td></tr>'; return; }
+  if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Failed to load</td></tr>'; return; }
 
   const { total, tokens } = res.data;
-  if (!tokens.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No tokens found</td></tr>'; renderPagination('tok-pagination', 0, 50, page, loadTokens); return; }
+  if (!tokens.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">No tokens found</td></tr>'; renderPagination('tok-pagination', 0, 50, page, loadTokens); return; }
 
   const now = new Date();
 
@@ -1860,10 +1878,14 @@ async function loadTokens(page = 1) {
     const status  = used ? 'badge-gray' : expired ? 'badge-red' : 'badge-green';
     const label   = used ? 'used' : expired ? 'expired' : 'valid';
     const tokenUrl = `https://${location.hostname}/register?token=${encodeURIComponent(t.token || t.id)}`;
+    const clickedCell = t.clicked_at
+      ? `<small class="text-muted">${fmtDateTime(t.clicked_at)}</small>`
+      : '<span class="text-muted">–</span>';
 
     return `<tr>
       <td class="mono">${t.policy_number}</td>
       <td>${t.email}</td>
+      <td>${clickedCell}</td>
       <td class="text-muted"><small>${fmtDateTime(t.expires_at)}</small></td>
       <td><span class="badge ${status}">${label}</span></td>
       <td class="text-muted"><small>${t.created_by_username || '–'}</small></td>

@@ -129,7 +129,6 @@ router.get('/route', async (req, res) => {
         signal: AbortSignal.timeout(15000),
       }
     );
-    console.log(`[flight-lookup/route] OAG ${oagUrl} → HTTP ${oagRes.status}`);
     if (oagRes.status === 404 || oagRes.status === 204) {
       return res.json({ flights: [] });
     }
@@ -139,7 +138,6 @@ router.get('/route', async (req, res) => {
       throw new Error(`OAG HTTP ${oagRes.status}`);
     }
     oagData = await oagRes.json();
-    console.log(`[flight-lookup/route] OAG returned ${oagData?.data?.length ?? 0} results`);
   } catch (err) {
     console.error('[flight-lookup/route] OAG API error:', err.message);
     if (!config.isProduction) {
