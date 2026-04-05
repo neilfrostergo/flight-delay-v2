@@ -543,56 +543,58 @@ function adminEmailHtml({ heading, bodyLines, ctaUrl, ctaLabel, expiryNote }) {
 </body></html>`;
 }
 
-async function sendAdminInvite({ username, email, setPasswordUrl }) {
-  const subject = 'You\'ve been invited to Flight Delay Admin — set your password';
-  const html = adminEmailHtml({
-    heading:    'Set up your admin account',
-    bodyLines:  [
-      `Hi ${username},`,
-      'You\'ve been added as an administrator on the Flight Delay platform. Click the button below to set your password and activate your account.',
-    ],
-    ctaUrl:     setPasswordUrl,
-    ctaLabel:   'Set my password',
-    expiryNote: '48 hours',
-  });
+async function sendAdminEmail({ toAddress, subject, html }) {
+  const to = config.devEmailOverride || toAddress;
 
   if (useAcs()) {
     const client = new EmailClient(config.acs.connectionString);
     await client.beginSend({
       senderAddress: acsSenderDomain(),
-      recipients: { to: [{ address: email }] },
+      recipients: { to: [{ address: to }] },
       content: { subject, html },
     });
   } else {
-    const transporter = nodemailer.createTransport(config.smtp);
-    await transporter.sendMail({ from: smtpFromAddress(), to: email, subject, html });
+    const transporter = nodemailer.createTransport({
+      host: config.smtp.host,
+      port: config.smtp.port,
+      auth: { user: config.smtp.user, pass: config.smtp.pass },
+    });
+    await transporter.sendMail({ from: smtpFromAddress(), to, subject, html });
   }
 }
 
-async function sendAdminPasswordReset({ username, email, setPasswordUrl }) {
-  const subject = 'Reset your Flight Delay Admin password';
-  const html = adminEmailHtml({
-    heading:    'Password reset requested',
-    bodyLines:  [
-      `Hi ${username},`,
-      'A password reset was requested for your admin account. Click the button below to choose a new password.',
-    ],
-    ctaUrl:     setPasswordUrl,
-    ctaLabel:   'Reset my password',
-    expiryNote: '1 hour',
+async function sendAdminInvite({ username, email, setPasswordUrl }) {
+  await sendAdminEmail({
+    toAddress: email,
+    subject:   'You\'ve been invited to Flight Delay Admin — set your password',
+    html: adminEmailHtml({
+      heading:    'Set up your admin account',
+      bodyLines:  [
+        `Hi ${username},`,
+        'You\'ve been added as an administrator on the Flight Delay platform. Click the button below to set your password and activate your account.',
+      ],
+      ctaUrl:     setPasswordUrl,
+      ctaLabel:   'Set my password',
+      expiryNote: '48 hours',
+    }),
   });
+}
 
-  if (useAcs()) {
-    const client = new EmailClient(config.acs.connectionString);
-    await client.beginSend({
-      senderAddress: acsSenderDomain(),
-      recipients: { to: [{ address: email }] },
-      content: { subject, html },
-    });
-  } else {
-    const transporter = nodemailer.createTransport(config.smtp);
-    await transporter.sendMail({ from: smtpFromAddress(), to: email, subject, html });
-  }
+async function sendAdminPasswordReset({ username, email, setPasswordUrl }) {
+  await sendAdminEmail({
+    toAddress: email,
+    subject:   'Reset your Flight Delay Admin password',
+    html: adminEmailHtml({
+      heading:    'Password reset requested',
+      bodyLines:  [
+        `Hi ${username},`,
+        'A password reset was requested for your admin account. Click the button below to choose a new password.',
+      ],
+      ctaUrl:     setPasswordUrl,
+      ctaLabel:   'Reset my password',
+      expiryNote: '1 hour',
+    }),
+  });
 }
 
 module.exports = {
