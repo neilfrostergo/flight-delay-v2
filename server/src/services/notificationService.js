@@ -442,7 +442,7 @@ async function _send(ctx, subject, html, text, flightRegId, flightEventId, payme
 
   try {
     if (useAcs()) {
-      await _sendViaAcs(to, subject, html, text, tenant?.name);
+      await _sendViaAcs(to, subject, html, text);
     } else {
       await _sendViaSmtp(to, subject, html, text);
     }
@@ -457,13 +457,10 @@ async function _send(ctx, subject, html, text, flightRegId, flightEventId, payme
   }
 }
 
-async function _sendViaAcs(to, subject, html, text, tenantName) {
+async function _sendViaAcs(to, subject, html, text) {
   const client = new EmailClient(config.acs.connectionString);
-  const displayName = tenantName
-    ? `${tenantName} Delayed?Paid! - DoNotReply`
-    : 'Delayed?Paid! - DoNotReply';
   const message = {
-    senderAddress: `${displayName} <${acsSenderDomain()}>`,
+    senderAddress: acsSenderDomain(),
     content: { subject, html, plainText: text },
     recipients: { to: [{ address: to }] },
   };
