@@ -1417,7 +1417,7 @@
         <label class="scan-shortcut-label" for="step2-scan-input">
           📄 Upload booking confirmation or itinerary to find your flight automatically
         </label>
-        <input type="file" id="step2-scan-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
+        <input type="file" id="step2-scan-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none"
                onchange="step2ScanDocument(this)">
         <div id="step2-scan-status" style="display:none"></div>
       </div>
@@ -1577,7 +1577,7 @@
           <div class="upload-drop-icon">📎</div>
           <div class="upload-drop-text">Drag a file here or <label for="upload-input" style="color:var(--brand);cursor:pointer;font-weight:600">browse</label></div>
           <div class="upload-drop-hint">PDF, JPEG or PNG · max 10 MB per file</div>
-          <input type="file" id="upload-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleFileInput(this)">
+          <input type="file" id="upload-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none" onchange="handleFileInput(this)">
         </div>
 
         <div id="upload-error" class="alert alert-error" style="display:none;margin-top:12px;"></div>
@@ -1655,7 +1655,7 @@
               <label class="scan-shortcut-label" for="portal-scan-input">
                 📄 Upload booking confirmation or itinerary to find your flight
               </label>
-              <input type="file" id="portal-scan-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
+              <input type="file" id="portal-scan-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none"
                      onchange="portalScanDocument(this)">
               <div id="portal-scan-status" style="display:none"></div>
             </div>
@@ -3259,7 +3259,7 @@ function renderPortalFlightCard(flight, reg) {
            + Upload booking confirmation or e-ticket
          </label>
          <input type="file" id="portal-file-${flight.id}"
-                accept=".pdf,.jpg,.jpeg,.png" style="display:none"
+                accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none"
                 onchange="portalUploadFile(${flight.id}, this)">
          <div id="portal-upload-err-${flight.id}" class="alert alert-error"
               style="display:none;margin-top:8px;font-size:13px"></div>

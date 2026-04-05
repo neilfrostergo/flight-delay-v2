@@ -62,25 +62,43 @@ function extractInfo(text) {
  * Returns { parseMethod, flightNumbers, dates }.
  */
 async function parseDocument(filePath, mimeType) {
-  if (mimeType !== 'application/pdf') {
-    // JPEG/PNG — OCR not available without additional setup
-    return { parseMethod: 'image_no_ocr', flightNumbers: [], dates: [] };
+  if (mimeType === 'application/pdf') {
+    try {
+      // pdf-parse is an optional peer dep — fail gracefully if missing.
+      // IMPORTANT: pass a fresh Uint8Array, not a Buffer directly.
+      // Node.js Buffers can have a non-zero byteOffset into their underlying
+      // ArrayBuffer, which causes pdf.js's XRef offset arithmetic to be wrong.
+      const pdfParse = require('pdf-parse');
+      const buf  = fs.readFileSync(filePath);
+      const data = await pdfParse(new Uint8Array(buf));
+      const info = extractInfo(data.text || '');
+      return { parseMethod: 'pdf', rawText: data.text || '', ...info };
+    } catch (err) {
+      console.warn('[documentParser] PDF parse error:', err.message);
+      return { parseMethod: 'pdf_error', flightNumbers: [], dates: [] };
+    }
   }
 
-  try {
-    // pdf-parse is an optional peer dep — fail gracefully if missing.
-    // IMPORTANT: pass a fresh Uint8Array, not a Buffer directly.
-    // Node.js Buffers can have a non-zero byteOffset into their underlying
-    // ArrayBuffer, which causes pdf.js's XRef offset arithmetic to be wrong.
-    const pdfParse = require('pdf-parse');
-    const buf  = fs.readFileSync(filePath);
-    const data = await pdfParse(new Uint8Array(buf));
-    const info = extractInfo(data.text || '');
-    return { parseMethod: 'pdf', rawText: data.text || '', ...info };
-  } catch (err) {
-    console.warn('[documentParser] PDF parse error:', err.message);
-    return { parseMethod: 'pdf_error', flightNumbers: [], dates: [] };
+  // JPEG/PNG — return image data for vision-based analysis in documentVerifier
+  if (mimeType === 'image/jpeg' || mimeType === 'image/png') {
+    try {
+      const buf         = fs.readFileSync(filePath);
+      const base64Image = buf.toString('base64');
+      return {
+        parseMethod:  'image',
+        rawText:      null,
+        base64Image,
+        imageMime:    mimeType,
+        flightNumbers: [],
+        dates:        [],
+      };
+    } catch (err) {
+      console.warn('[documentParser] Image read error:', err.message);
+      return { parseMethod: 'image_error', flightNumbers: [], dates: [] };
+    }
   }
+
+  return { parseMethod: 'unsupported', flightNumbers: [], dates: [] };
 }
 
 /**

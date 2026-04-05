@@ -364,8 +364,10 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
 
     let matchStatus, matchedFlightId, matchConfidence;
 
-    if (parsed.parseMethod === 'image_no_ocr') {
-      matchStatus = 'image_no_ocr';
+    if (parsed.parseMethod === 'image') {
+      matchStatus = 'pending_ai'; // AI will set to matched or rejected below
+    } else if (parsed.parseMethod === 'image_error' || parsed.parseMethod === 'unsupported') {
+      matchStatus = 'unreadable';
     } else if (parsed.parseMethod === 'pdf_error') {
       matchStatus = 'unreadable';
     } else if (matchResult) {
@@ -376,14 +378,21 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
       matchStatus = 'no_match';
     }
 
-    // AI authenticity verification — runs when text was extracted successfully
+    // AI authenticity verification — runs for PDF (text) and images (vision)
     let aiResult = { genuine: null, confidence: null, passengerName: null, reason: null };
-    if (parsed.parseMethod === 'pdf' && parsed.rawText) {
+    const canVerify = (parsed.parseMethod === 'pdf' && parsed.rawText) ||
+                      (parsed.parseMethod === 'image' && parsed.base64Image);
+    if (canVerify) {
       const targetFlight = allFlights.rows.find(f => f.id === flightId);
-      aiResult = await verifyDocument(parsed.rawText, targetFlight);
+      aiResult = await verifyDocument(parsed, targetFlight);
 
-      // If AI is available and says not genuine — downgrade match to rejected
-      if (aiResult.genuine === false && aiResult.confidence === 'high') {
+      if (aiResult.genuine === true && parsed.parseMethod === 'image') {
+        // Image verified as genuine by AI — treat as matched (regex can't read images)
+        matchStatus     = 'matched';
+        matchedFlightId = flightId;
+        matchConfidence = aiResult.confidence;
+      } else if (aiResult.genuine === false && aiResult.confidence === 'high') {
+        // AI confident it's not genuine — reject regardless of regex match
         matchStatus = 'rejected';
         console.warn(`[customerPortal] AI rejected document for reg ${registrationId} flight ${flightId}: ${aiResult.reason}`);
       }

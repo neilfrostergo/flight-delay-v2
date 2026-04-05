@@ -17,39 +17,11 @@ function isAvailable() {
   return Boolean(config.azureOpenAI.endpoint);
 }
 
-async function verifyDocument(extractedText, registeredFlight) {
-  if (!isAvailable()) {
-    return { genuine: null, confidence: null, passengerName: null, reason: 'AI verification not configured' };
-  }
-
-  try {
-    const { AzureOpenAI } = require('@azure/openai');
-    const { ManagedIdentityCredential } = require('@azure/identity');
-
-    const credential = new ManagedIdentityCredential({ clientId: config.azureOpenAI.clientId });
-    const client     = new AzureOpenAI({
-      endpoint:    config.azureOpenAI.endpoint,
-      deployment:  config.azureOpenAI.deployment,
-      apiVersion:  '2024-10-21',
-      azureADTokenProvider: async () => {
-        const token = await credential.getToken('https://cognitiveservices.azure.com/.default');
-        return token.token;
-      },
-    });
-
-    const flightInfo = registeredFlight
-      ? `Flight: ${registeredFlight.flight_number}, Date: ${String(registeredFlight.dep_date).slice(0, 10)}`
-      : 'No flight details provided';
-
-    const prompt = `You are a fraud detection assistant for a flight delay insurance platform.
-Analyse the following text extracted from a document uploaded by a customer to support a claim.
+function buildPrompt(flightInfo) {
+  return `You are a fraud detection assistant for a flight delay insurance platform.
+Analyse the document provided by a customer to support a delay benefit claim.
 
 ${flightInfo}
-
-Extracted document text:
----
-${extractedText.slice(0, 4000)}
----
 
 Respond with a JSON object (no markdown) with these fields:
 - genuine: true if this appears to be an authentic travel booking confirmation, e-ticket, or itinerary from a real travel company or airline; false if it appears fabricated, minimal, or suspicious
@@ -58,10 +30,69 @@ Respond with a JSON object (no markdown) with these fields:
 - reason: one sentence explaining your assessment
 
 A genuine document will typically have: a booking reference, passenger name, airline/travel company branding or name, origin/destination airports, and flight number. Be suspicious of documents with only a flight number and date and nothing else.`;
+}
+
+async function getClient() {
+  const { AzureOpenAI }           = require('@azure/openai');
+  const { ManagedIdentityCredential } = require('@azure/identity');
+  const credential = new ManagedIdentityCredential({ clientId: config.azureOpenAI.clientId });
+  return new AzureOpenAI({
+    endpoint:   config.azureOpenAI.endpoint,
+    deployment: config.azureOpenAI.deployment,
+    apiVersion: '2024-10-21',
+    azureADTokenProvider: async () => {
+      const token = await credential.getToken('https://cognitiveservices.azure.com/.default');
+      return token.token;
+    },
+  });
+}
+
+/**
+ * Verify a document using AI.
+ * parsed: output from documentParser.parseDocument()
+ * registeredFlight: { flight_number, dep_date }
+ */
+async function verifyDocument(parsed, registeredFlight) {
+  if (!isAvailable()) {
+    return { genuine: null, confidence: null, passengerName: null, reason: 'AI verification not configured' };
+  }
+
+  try {
+    const client = await getClient();
+
+    const flightInfo = registeredFlight
+      ? `Flight being claimed: ${registeredFlight.flight_number} on ${String(registeredFlight.dep_date).slice(0, 10)}`
+      : 'No flight details provided';
+
+    const prompt = buildPrompt(flightInfo);
+
+    let messages;
+
+    if (parsed.parseMethod === 'image' && parsed.base64Image) {
+      // Vision path — use gpt-4o (supports vision), send image directly
+      messages = [{
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: `data:${parsed.imageMime};base64,${parsed.base64Image}`, detail: 'low' } },
+        ],
+      }];
+    } else if (parsed.rawText) {
+      // Text path — standard completion
+      messages = [{
+        role: 'user',
+        content: `${prompt}\n\nExtracted document text:\n---\n${parsed.rawText.slice(0, 4000)}\n---`,
+      }];
+    } else {
+      return { genuine: null, confidence: null, passengerName: null, reason: 'No content to verify' };
+    }
+
+    // Use gpt-4o for vision (images), gpt-4o-mini for text
+    const model = (parsed.parseMethod === 'image') ? 'gpt4o-prd' : config.azureOpenAI.deployment;
 
     const response = await client.chat.completions.create({
-      model:       config.azureOpenAI.deployment,
-      messages:    [{ role: 'user', content: prompt }],
+      model,
+      messages,
       temperature: 0,
       max_tokens:  256,
     });
