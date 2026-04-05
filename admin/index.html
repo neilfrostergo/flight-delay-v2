@@ -2139,7 +2139,8 @@ async function previewDocument(id, name, mime, awaitingPayment) {
     if (!body) return; // user navigated away
     body.style.padding = '0';
 
-    if (mime.startsWith('image/')) {
+    // Server renders PDFs to PNG, so always use <img> — check actual response type
+    if (blobData.type.startsWith('image/')) {
       body.innerHTML = `<img src="${docPreviewObjectUrl}" style="max-width:100%;max-height:70vh;display:block;margin:auto;object-fit:contain;padding:12px" />`;
     } else {
       body.innerHTML = `<iframe src="${docPreviewObjectUrl}" class="doc-preview-frame" title="${esc(name)}"></iframe>`;

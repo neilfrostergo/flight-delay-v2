@@ -6,7 +6,8 @@ const path    = require('path');
 const { query } = require('../../db/connection');
 const { adminTenantScope } = require('../../middleware/requireAdmin');
 const { triggerDeferredPayment } = require('../../services/delayProcessor');
-const blob = require('../../services/blobStorage');
+const blob        = require('../../services/blobStorage');
+const { renderFirstPage } = require('../../services/pdfRenderer');
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', '..', 'uploads');
 
@@ -160,28 +161,40 @@ router.get('/:id/content', async (req, res) => {
   }
 
   const { registration_id, stored_name, mime_type } = result.rows[0];
-  const contentType = mime_type || 'application/octet-stream';
+  const isPdf = mime_type === 'application/pdf';
 
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Content-Disposition', 'inline');
-
+  // Fetch the raw file buffer
+  let fileBuffer;
   if (blob.isAvailable()) {
     try {
       const blobKey = blob.blobName(registration_id, stored_name);
-      const buffer  = await blob.downloadToBuffer(blobKey);
-      return res.send(buffer);
+      fileBuffer = await blob.downloadToBuffer(blobKey);
     } catch (err) {
       console.error('[admin/documents] blob download error:', err.message);
       return res.status(502).json({ error: 'Could not retrieve document' });
     }
   } else {
-    // Local dev — file on disk
     const filePath = path.join(UPLOADS_DIR, String(registration_id), stored_name);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found on disk' });
     }
-    return res.sendFile(filePath);
+    fileBuffer = fs.readFileSync(filePath);
   }
+
+  // PDFs: render first page to PNG so no PDF reader required
+  if (isPdf) {
+    const png = await renderFirstPage(fileBuffer);
+    if (png) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Content-Disposition', 'inline');
+      return res.send(png);
+    }
+    // pdftoppm not installed — fall through and serve raw PDF
+  }
+
+  res.setHeader('Content-Type', mime_type || 'application/octet-stream');
+  res.setHeader('Content-Disposition', 'inline');
+  return res.send(fileBuffer);
 });
 
 module.exports = router;
