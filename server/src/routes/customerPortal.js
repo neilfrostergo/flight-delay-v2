@@ -596,7 +596,7 @@ router.delete('/flights/:flightId', requireCustomer, async (req, res) => {
     return res.status(409).json({ error: 'This flight has already been paid out and cannot be removed' });
   }
 
-  // Delete linked documents from storage and DB
+  // Delete all child rows that reference this flight_registration (no ON DELETE CASCADE)
   const docs = await query(
     `DELETE FROM registration_documents WHERE flight_registration_id = $1 RETURNING stored_name`,
     [flightId]
@@ -608,9 +608,15 @@ router.delete('/flights/:flightId', requireCustomer, async (req, res) => {
       fs.unlink(path.join(UPLOADS_DIR, String(registrationId), doc.stored_name), () => {});
     }
   }
-
-  await query(`DELETE FROM notifications WHERE flight_registration_id = $1`, [flightId]);
-  await query(`DELETE FROM flight_registrations WHERE id = $1`, [flightId]);
+  // Null out matched_flight_id on docs linked via a different flight_registration
+  await query(
+    `UPDATE registration_documents SET matched_flight_id = NULL WHERE matched_flight_id = $1`,
+    [flightId]
+  );
+  await query(`DELETE FROM payments               WHERE flight_registration_id = $1`, [flightId]);
+  await query(`DELETE FROM notifications           WHERE flight_registration_id = $1`, [flightId]);
+  await query(`DELETE FROM document_upload_tokens WHERE flight_registration_id = $1`, [flightId]);
+  await query(`DELETE FROM flight_registrations   WHERE id = $1`, [flightId]);
 
   return res.json({ ok: true });
 });
