@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azure Infrastructure — flight-delay-v2</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --brand:      #0078d4;
+    --brand-dark: #005a9e;
+    --prod:       #107c10;
+    --prod-bg:    #e6f4e6;
+    --uat:        #6b3fa0;
+    --uat-bg:     #f0e8f8;
+    --warn:       #b45309;
+    --warn-bg:    #fef3c7;
+    --danger:     #a4262c;
+    --danger-bg:  #fde7e9;
+    --text:       #201f1e;
+    --muted:      #605e5c;
+    --border:     #e1dfdd;
+    --bg:         #f3f2f1;
+    --white:      #ffffff;
+    --code-bg:    #f8f8f8;
+    --sidebar-w:  260px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: #1b1a19;
+    color: #c8c6c4;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 0 0 40px;
+  }
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid #3b3a39;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .sidebar-logo-icon {
+    width: 32px; height: 32px;
+    background: var(--brand);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .sidebar-logo-text { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3; }
+  .sidebar-logo-sub  { font-size: 11px; color: #797775; margin-top: 1px; }
+
+  .sidebar-section { padding: 16px 0 4px 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #797775; }
+
+  .sidebar nav a {
+    display: block;
+    padding: 6px 20px;
+    color: #c8c6c4;
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: background 0.1s, color 0.1s;
+  }
+  .sidebar nav a:hover { background: #292827; color: #fff; border-left-color: var(--brand); }
+  .sidebar nav a.active { background: #292827; color: #fff; border-left-color: var(--brand); }
+  .sidebar nav a.sub { padding-left: 32px; font-size: 12px; color: #a19f9d; }
+
+  /* ── Main content ── */
+  .content {
+    flex: 1;
+    min-width: 0;
+    padding: 40px 48px 80px;
+    max-width: 1100px;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    margin-bottom: 36px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+  }
+  .page-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .page-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .meta-pill strong { color: var(--text); }
+
+  /* ── Sections ── */
+  .section { margin-bottom: 48px; }
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .icon { font-size: 22px; }
+  .subsection { margin-bottom: 28px; }
+  .subsection-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h4 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin: 16px 0 8px; }
+
+  p { margin-bottom: 12px; color: var(--text); }
+  ul { margin: 0 0 12px 20px; }
+  ul li { margin-bottom: 4px; }
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin-bottom: 16px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  thead th {
+    background: #f8f7f6;
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #faf9f8; }
+
+  /* ── Code / monospace ── */
+  code {
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: #a4262c;
+  }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-prod    { background: var(--prod-bg);   color: var(--prod); }
+  .badge-uat     { background: var(--uat-bg);    color: var(--uat); }
+  .badge-warn    { background: var(--warn-bg);   color: var(--warn); }
+  .badge-danger  { background: var(--danger-bg); color: var(--danger); }
+  .badge-blue    { background: #dce9f8;          color: var(--brand-dark); }
+  .badge-gray    { background: #f3f2f1;          color: var(--muted); }
+
+  /* ── Alert boxes ── */
+  .alert {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .alert-body { flex: 1; }
+  .alert-title { font-weight: 700; margin-bottom: 4px; }
+  .alert-warn   { background: var(--warn-bg);   border: 1px solid #fcd34d; }
+  .alert-danger { background: var(--danger-bg); border: 1px solid #fca5a5; }
+  .alert-info   { background: #dce9f8;          border: 1px solid #93c5fd; }
+  .alert-warn   .alert-title { color: var(--warn); }
+  .alert-danger .alert-title { color: var(--danger); }
+  .alert-info   .alert-title { color: var(--brand-dark); }
+
+  /* ── Env comparison cards ── */
+  .env-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .env-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .env-card-header {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .env-card-header.prod { background: var(--prod-bg); color: var(--prod); }
+  .env-card-header.uat  { background: var(--uat-bg);  color: var(--uat); }
+  .env-card-body { padding: 12px 16px; }
+  .env-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; gap: 8px; }
+  .env-row:last-child { border-bottom: none; }
+  .env-label { color: var(--muted); flex-shrink: 0; }
+  .env-value { font-weight: 600; text-align: right; }
+
+  /* ── Gaps list ── */
+  .gap-list { display: flex; flex-direction: column; gap: 10px; }
+  .gap-item {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-left: 4px solid;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+  .gap-item.security { border-left-color: var(--danger); }
+  .gap-item.infra    { border-left-color: var(--warn); }
+  .gap-label { font-weight: 700; margin-bottom: 4px; }
+  .gap-label.security { color: var(--danger); }
+  .gap-label.infra    { color: var(--warn); }
+
+  /* ── Naming grid ── */
+  .naming-grid {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr;
+    gap: 0;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  .naming-grid .hdr {
+    background: #f8f7f6;
+    padding: 8px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .naming-grid .cell {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .naming-grid .cell:last-child,
+  .naming-grid .hdr:last-child { border-right: none; }
+  .naming-grid .row-last .cell,
+  .naming-grid .row-last .hdr  { border-bottom: none; }
+
+  @media (max-width: 900px) {
+    .content { padding: 24px 20px 60px; }
+    .env-grid { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">☁️</div>
+      <div>
+        <div class="sidebar-logo-text">flight-delay-v2</div>
+        <div class="sidebar-logo-sub">Infrastructure Reference</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">Contents</div>
+    <nav>
+      <a href="#overview">1. Overview</a>
+      <a href="#subscriptions">2. Subscriptions &amp; Resource Groups</a>
+      <a href="#networking">3. Networking</a>
+      <a href="#networking" class="sub">VNets &amp; Subnets</a>
+      <a href="#nat" class="sub">NAT Gateway</a>
+      <a href="#private-endpoints" class="sub">Private Endpoints</a>
+      <a href="#dns" class="sub">DNS &amp; Front Door</a>
+      <a href="#containers">4. Container Infrastructure</a>
+      <a href="#acr" class="sub">Container Registry</a>
+      <a href="#aca-env" class="sub">ACA Environments</a>
+      <a href="#apps" class="sub">Container Apps</a>
+      <a href="#jobs" class="sub">Container App Jobs</a>
+      <a href="#database">5. Database</a>
+      <a href="#keyvaults">6. Key Vaults</a>
+      <a href="#eventhub">7. Event Hubs</a>
+      <a href="#observability">8. Observability</a>
+      <a href="#identity">9. Identity &amp; Access</a>
+      <a href="#cicd">10. CI/CD</a>
+      <a href="#storage">11. Storage</a>
+      <a href="#comms">12. Communication Services</a>
+      <a href="#naming">13. Naming Conventions</a>
+      <a href="#gaps">14. Gaps &amp; Issues</a>
+    </nav>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="content">
+
+    <div class="page-header">
+      <div class="page-title">Azure Infrastructure — flight-delay-v2</div>
+      <div class="page-meta">
+        <span class="meta-pill">📅 <strong>Audited:</strong> 5 April 2026</span>
+        <span class="meta-pill">🔑 <strong>Subscription:</strong> AI Corp Landing Zone (<code>3fc25908-60fa-46ed-9027-6890ee798270</code>)</span>
+        <span class="meta-pill">🏢 <strong>AD Tenant:</strong> ERGO Travel Group (<code>d5200dfe-1ac0-4607-a991-1d18b6051750</code>)</span>
+        <span class="meta-pill">📍 <strong>Region:</strong> UK South (all resources unless noted)</span>
+      </div>
+    </div>
+
+    <!-- ── 1. Overview ── -->
+    <section class="section" id="overview">
+      <div class="section-title"><span class="icon">🏗️</span> 1. Overview</div>
+      <p>The flight-delay-v2 platform runs as a containerised Node.js/Express/PostgreSQL application on Azure Container Apps, fronted by Azure Front Door Premium in production. Two environments share the same subscription and container registry.</p>
+
+      <div class="env-grid">
+        <div class="env-card">
+          <div class="env-card-header prod">🟢 Production</div>
+          <div class="env-card-body">
+            <div class="env-row"><span class="env-label">Resource Group</span><span class="env-value"><code>fdv2-prod-rg</code></span></div>
+            <div class="env-row"><span class="env-label">Domain</span><span class="env-value"><code>*.delayedpaid.co.uk</code></span></div>
+            <div class="env-row"><span class="env-label">Network</span><span class="env-value">Private (Front Door + Private Link)</span></div>
+            <div class="env-row"><span class="env-label">WAF</span><span class="env-value">Yes — Premium SKU</span></div>
+          </div>
+        </div>
+        <div class="env-card">
+          <div class="env-card-header uat">🟣 UAT</div>
+          <div class="env-card-body">
+            <div class="env-row"><span class="env-label">Resource Group</span><span class="env-value"><code>fdv2-uat-rg</code></span></div>
+            <div class="env-row"><span class="env-label">Domain</span><span class="env-value"><code>*.uat.delayedpaid.co.uk</code></span></div>
+            <div class="env-row"><span class="env-label">Network</span><span class="env-value">Public ACA environment</span></div>
+            <div class="env-row"><span class="env-label">WAF</span><span class="env-value">No</span></div>
+          </div>
+        </div>
+      </div>
+
+      <h4>Key architectural properties</h4>
+      <ul>
+        <li>All secrets are stored in per-environment Azure Key Vaults; no credentials are baked into container images.</li>
+        <li>Container Apps pull images from <code>fdv2acr.azurecr.io</code> using user-assigned managed identities (no registry passwords).</li>
+        <li>The production Container App environment is <strong>internal</strong> (no public IP), accessible only through Azure Front Door via Private Link.</li>
+        <li>PostgreSQL servers are fully private (delegated subnet, private DNS zone, no public endpoint).</li>
+        <li>Event Hubs receives OAG flight alert events over a private endpoint.</li>
+      </ul>
+    </section>
+
+    <!-- ── 2. Subscriptions ── -->
+    <section class="section" id="subscriptions">
+      <div class="section-title"><span class="icon">📂</span> 2. Subscriptions &amp; Resource Groups</div>
+
+      <div class="subsection">
+        <div class="subsection-title">Subscriptions</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Subscription ID</th><th>Default</th></tr></thead>
+            <tbody>
+              <tr><td><strong>AI Corp Landing Zone</strong></td><td><code>3fc25908-60fa-46ed-9027-6890ee798270</code></td><td><span class="badge badge-blue">Yes</span></td></tr>
+              <tr><td>Azure subscription 1</td><td><code>473a74ab-d8eb-42fb-aed8-5a1c63c203db</code></td><td><span class="badge badge-gray">No</span></td></tr>
+              <tr><td>identity</td><td><code>f9a88c87-099d-4fcc-a30c-ade62c588474</code></td><td><span class="badge badge-gray">No</span></td></tr>
+              <tr><td>management</td><td><code>a60ec9b5-358c-4f58-857a-faf5fd0893a7</code></td><td><span class="badge badge-gray">No</span></td></tr>
+              <tr><td>AI Online Landing Zone</td><td><code>ac51521f-f431-4c53-ac43-9e7c7bc081f0</code></td><td><span class="badge badge-gray">No</span></td></tr>
+              <tr><td>connectivity</td><td><code>3ce96a93-a8fa-4482-8bf4-0f10f2aeaf3a</code></td><td><span class="badge badge-gray">No</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>All flight-delay-v2 resources live in the <strong>AI Corp Landing Zone</strong> subscription.</p>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">Resource Groups</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Location</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-prod-rg</code></td><td>UK South</td><td>All production resources</td></tr>
+              <tr><td><code>fdv2-uat-rg</code></td><td>UK South</td><td>All UAT resources</td></tr>
+              <tr><td><code>fdv2-aca-infra-rg</code></td><td>UK South</td><td>Supporting infra for prod ACA environment (pre-existing)</td></tr>
+              <tr><td><code>fdv2-aca-managed</code></td><td>UK South</td><td>Azure-managed RG for prod ACA environment infrastructure</td></tr>
+              <tr><td><code>ME_fdv2-uat-aca-env_fdv2-uat-rg_uksouth</code></td><td>UK South</td><td>Azure-managed RG for UAT ACA environment</td></tr>
+              <tr><td><code>ME_fdv2-uat-env_fdv2-uat-rg_uksouth</code></td><td>UK South</td><td>Azure-managed (legacy, from earlier UAT environment iteration)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 3. Networking ── -->
+    <section class="section" id="networking">
+      <div class="section-title"><span class="icon">🌐</span> 3. Networking</div>
+
+      <div class="subsection">
+        <div class="subsection-title">Virtual Networks</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Resource Group</th><th>Address Space</th><th>Subnets</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-vnet</code></td><td><code>fdv2-prod-rg</code></td><td><code>10.100.0.0/16</code></td><td>3</td></tr>
+              <tr><td><code>fdv2-uat-vnet</code></td><td><code>fdv2-uat-rg</code></td><td><code>10.101.0.0/16</code></td><td>3</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>No VNet peerings are configured between production and UAT.</p>
+
+        <h4>Production VNet Subnets (<code>fdv2-vnet</code>)</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Subnet</th><th>CIDR</th><th>Delegation</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-aca-subnet</code></td><td><code>10.100.0.0/21</code></td><td><code>Microsoft.App/environments</code></td><td>Container Apps environment; NAT gateway attached</td></tr>
+              <tr><td><code>fdv2-data-subnet</code></td><td><code>10.100.8.0/24</code></td><td><code>Microsoft.DBforPostgreSQL/flexibleServers</code></td><td>PostgreSQL flexible server; Storage service endpoint enabled</td></tr>
+              <tr><td><code>fdv2-pe-subnet</code></td><td><code>10.100.9.0/24</code></td><td>None</td><td>Private endpoints (Key Vault, Event Hub)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>UAT VNet Subnets (<code>fdv2-uat-vnet</code>)</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Subnet</th><th>CIDR</th><th>Delegation</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-uat-aca-subnet</code></td><td><code>10.101.0.0/21</code></td><td><code>Microsoft.App/environments</code></td><td>Container Apps environment</td></tr>
+              <tr><td><code>fdv2-uat-data-subnet</code></td><td><code>10.101.8.0/24</code></td><td><code>Microsoft.DBforPostgreSQL/flexibleServers</code></td><td>PostgreSQL flexible server; Storage service endpoint enabled</td></tr>
+              <tr><td><code>fdv2-uat-pe-subnet</code></td><td><code>10.101.9.0/24</code></td><td>None</td><td>Private endpoints (Key Vault)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subsection" id="nat">
+        <div class="subsection-title">NAT Gateway (Production only)</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Resource</th><th>Details</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-nat-gateway</code></td><td>Attached to <code>fdv2-aca-subnet</code>; static outbound IP via <code>fdv2-nat-ip</code></td></tr>
+              <tr><td><code>fdv2-nat-ip</code></td><td>Static public IP address for all production outbound traffic</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>UAT does <strong>not</strong> use a NAT gateway; outbound traffic uses the shared ACA environment pool.</p>
+      </div>
+
+      <div class="subsection" id="private-endpoints">
+        <div class="subsection-title">Private Endpoints</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Resource</th><th>Private Endpoint</th><th>DNS Zone</th><th>VNet</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-keyvault</code></td><td><code>fdv2-kv-pe</code></td><td><code>privatelink.vaultcore.azure.net</code></td><td><code>fdv2-vnet</code></td></tr>
+              <tr><td><code>fdv2-eventhub</code></td><td><code>fdv2-eventhub-pe</code></td><td><code>privatelink.servicebus.windows.net</code></td><td><code>fdv2-vnet</code></td></tr>
+              <tr><td><code>fdv2-uat-keyvault</code></td><td><code>fdv2-uat-kv-pe</code></td><td><code>privatelink.vaultcore.azure.net</code></td><td><code>fdv2-uat-vnet</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The production ACA environment also accepts an inbound private endpoint connection from Azure Front Door.</p>
+
+        <h4>Private DNS Zones (Production)</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Zone</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-postgres.private.postgres.database.azure.com</code></td><td>PostgreSQL flexible server resolution</td></tr>
+              <tr><td><code>postgres.database.azure.com</code></td><td>Additional PostgreSQL DNS (legacy)</td></tr>
+              <tr><td><code>privatelink.vaultcore.azure.net</code></td><td>Key Vault private endpoint resolution</td></tr>
+              <tr><td><code>privatelink.servicebus.windows.net</code></td><td>Event Hub private endpoint resolution</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subsection" id="dns">
+        <div class="subsection-title">DNS — Public Zone (<code>delayedpaid.co.uk</code>)</div>
+        <p>Zone hosted on Azure Public DNS in <code>fdv2-prod-rg</code>, global.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Record</th><th>Type</th><th>TTL</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td><code>@</code></td><td>SOA / NS</td><td>172800 / 3600</td><td>Zone apex</td></tr>
+              <tr><td><code>*</code></td><td>CNAME</td><td>3600</td><td>Wildcard — production tenants</td></tr>
+              <tr><td><code>ergo</code></td><td>CNAME</td><td>3600</td><td>Prod ERGO tenant</td></tr>
+              <tr><td><code>asuid.ergo</code></td><td>TXT</td><td>3600</td><td>Custom domain verification</td></tr>
+              <tr><td><code>www</code></td><td>CNAME</td><td>3600</td><td>Production www</td></tr>
+              <tr><td><code>*.uat</code></td><td>CNAME</td><td>3600</td><td>Wildcard — UAT tenants</td></tr>
+              <tr><td><code>ergo.uat</code></td><td>CNAME</td><td>3600</td><td>UAT ERGO tenant</td></tr>
+              <tr><td><code>www.uat</code></td><td>CNAME</td><td>3600</td><td>UAT www</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection-title" style="margin-top:20px">Azure Front Door (Production)</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Name</td><td><code>fdv2-frontdoor</code></td></tr>
+              <tr><td>Resource group</td><td><code>fdv2-prod-rg</code></td></tr>
+              <tr><td>SKU</td><td><span class="badge badge-blue">Premium_AzureFrontDoor</span></td></tr>
+              <tr><td>Front Door ID</td><td><code>cdc2b395-0e37-4675-af41-cfaff02ed905</code></td></tr>
+              <tr><td>Endpoint</td><td><code>fdv2-endpoint-b7fsdzfedegeh8dv.a03.azurefd.net</code></td></tr>
+              <tr><td>WAF Policy</td><td><code>fdv2WafPolicy</code> (global)</td></tr>
+              <tr><td>Health probe</td><td><code>GET /api/health</code> (HTTPS, every 30 s)</td></tr>
+              <tr><td>Route</td><td><code>/*</code> — HTTP redirected to HTTPS, forwarding HTTPS only</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The ACA environment has <code>publicNetworkAccess: Disabled</code>. All inbound traffic arrives via Front Door's private endpoint connection.</p>
+      </div>
+    </section>
+
+    <!-- ── 4. Container Infrastructure ── -->
+    <section class="section" id="containers">
+      <div class="section-title"><span class="icon">📦</span> 4. Container Infrastructure</div>
+
+      <div class="subsection" id="acr">
+        <div class="subsection-title">Container Registry — <code>fdv2acr</code></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Login server</td><td><code>fdv2acr.azurecr.io</code></td></tr>
+              <tr><td>SKU</td><td><span class="badge badge-warn">Basic</span></td></tr>
+              <tr><td>Location</td><td>UK South</td></tr>
+              <tr><td>Resource group</td><td><code>fdv2-prod-rg</code></td></tr>
+              <tr><td>Admin user</td><td>Disabled</td></tr>
+              <tr><td>Public network access</td><td>Enabled (no private endpoint)</td></tr>
+              <tr><td>Retention policy</td><td><span class="badge badge-warn">Disabled</span> — images accumulate indefinitely</td></tr>
+              <tr><td>Repository</td><td><code>fdv2-app</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h4>Image Tag Conventions</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Environment</th><th>Tags pushed</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-prod">Production</span></td><td><code>&lt;git-sha&gt;</code> and <code>latest</code></td></tr>
+              <tr><td><span class="badge badge-uat">UAT</span></td><td><code>develop-&lt;git-sha&gt;</code> and <code>develop-latest</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subsection" id="aca-env">
+        <div class="subsection-title">Container App Environments</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th><span class="badge badge-prod">Production</span> fdv2-aca-env</th><th><span class="badge badge-uat">UAT</span> fdv2-uat-aca-env</th></tr></thead>
+            <tbody>
+              <tr><td>Resource group</td><td><code>fdv2-prod-rg</code></td><td><code>fdv2-uat-rg</code></td></tr>
+              <tr><td>Static IP</td><td><code>10.100.6.51</code> (internal)</td><td><code>20.26.140.214</code> (public)</td></tr>
+              <tr><td>Public network access</td><td><strong>Disabled</strong></td><td>Enabled</td></tr>
+              <tr><td>VNet subnet</td><td><code>10.100.0.0/21</code></td><td><code>10.101.0.0/21</code></td></tr>
+              <tr><td>Zone redundant</td><td>No</td><td>No</td></tr>
+              <tr><td>Log Analytics</td><td><code>fdv2-logs</code></td><td><code>fdv2-uat-logs</code></td></tr>
+              <tr><td>Workload profiles</td><td>Consumption only</td><td>Consumption only</td></tr>
+              <tr><td>KEDA version</td><td>2.17.2</td><td>2.17.2</td></tr>
+              <tr><td>Dapr version</td><td>1.16.4-msft.2</td><td>1.16.4-msft.2</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subsection" id="apps">
+        <div class="subsection-title">Container Apps</div>
+
+        <h4>Production — <code>fdv2-app</code></h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>FQDN</td><td><code>fdv2-app.yellowbeach-70b56e52.uksouth.azurecontainerapps.io</code></td></tr>
+              <tr><td>Latest revision</td><td><code>fdv2-app--0000012</code></td></tr>
+              <tr><td>CPU / Memory</td><td>0.5 vCPU / 1 Gi</td></tr>
+              <tr><td>Min / Max replicas</td><td>1 / 5</td></tr>
+              <tr><td>Target port</td><td>3000</td></tr>
+              <tr><td>Identity</td><td><code>fdv2-identity</code> (<code>c2fe2b0c-ddb5-486b-a7d7-893e853f6a8e</code>)</td></tr>
+              <tr><td>Registry auth</td><td>Via managed identity — no password</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>Environment Variables (plain)</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td><code>NODE_ENV</code></td><td><code>production</code></td></tr>
+              <tr><td><code>PORT</code></td><td><code>3000</code></td></tr>
+              <tr><td><code>BASE_DOMAIN</code></td><td><code>delayedpaid.co.uk</code></td></tr>
+              <tr><td><code>AZURE_CLIENT_ID</code></td><td><code>c2fe2b0c-ddb5-486b-a7d7-893e853f6a8e</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>Secrets (sourced from Key Vault via managed identity)</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Secret ref</th><th>Key Vault secret name</th></tr></thead>
+            <tbody>
+              <tr><td><code>database-url</code></td><td><code>DATABASE-URL</code></td></tr>
+              <tr><td><code>jwt-secret</code></td><td><code>JWT-SECRET</code></td></tr>
+              <tr><td><code>encryption-key</code></td><td><code>ENCRYPTION-KEY</code></td></tr>
+              <tr><td><code>smtp-host</code></td><td><code>SMTP-HOST</code></td></tr>
+              <tr><td><code>smtp-port</code></td><td><code>SMTP-PORT</code></td></tr>
+              <tr><td><code>smtp-user</code></td><td><code>SMTP-USER</code></td></tr>
+              <tr><td><code>smtp-pass</code></td><td><code>SMTP-PASS</code></td></tr>
+              <tr><td><code>event-hub-conn-str</code></td><td><code>event-hub-connection-string</code></td></tr>
+              <tr><td><code>event-hub-storage-conn-str</code></td><td><code>event-hub-storage-connection-string</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>UAT — <code>fdv2-uat-app</code></h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>FQDN</td><td><code>fdv2-uat-app.blackdesert-d8445a44.uksouth.azurecontainerapps.io</code></td></tr>
+              <tr><td>Latest revision</td><td><code>fdv2-uat-app--0000056</code></td></tr>
+              <tr><td>CPU / Memory</td><td>0.5 vCPU / 1 Gi</td></tr>
+              <tr><td>Min / Max replicas</td><td>0 / 2</td></tr>
+              <tr><td>Scale rule</td><td><code>office-hours</code> (KEDA cron): scale to 1 Mon–Fri 08:00–19:00 Europe/London</td></tr>
+              <tr><td>Custom domains</td><td><code>ergo.uat.delayedpaid.co.uk</code>, <code>www.uat.delayedpaid.co.uk</code></td></tr>
+              <tr><td>Identity</td><td><code>fdv2-uat-identity</code> (<code>88b52eda-ab63-41bd-b5bc-872eb6d3dbed</code>)</td></tr>
+              <tr><td><code>NODE_ENV</code></td><td><code>uat</code></td></tr>
+              <tr><td><code>BASE_DOMAIN</code></td><td><code>uat.delayedpaid.co.uk</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subsection" id="jobs">
+        <div class="subsection-title">Container App Jobs</div>
+        <h4>Production</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Job</th><th>Trigger</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-migrate-prod</code></td><td>Manual</td><td>Run DB migrations — Key Vault-sourced secrets <span class="badge badge-blue">Preferred</span></td></tr>
+              <tr><td><code>fdv2-migrate</code></td><td>Manual</td><td>Run DB migrations (earlier variant)</td></tr>
+              <tr><td><code>fdv2-migrate-diag</code></td><td>Manual</td><td><span class="badge badge-danger">⚠ Hardcoded credentials — should be retired</span></td></tr>
+              <tr><td><code>fdv2-seed-diag</code></td><td>Manual</td><td><span class="badge badge-danger">⚠ Hardcoded credentials — should be retired</span></td></tr>
+              <tr><td><code>fdv2-sync-job</code></td><td>Manual / GitHub Actions schedule</td><td>Sync carrier/airport reference data from Snowflake → PostgreSQL</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h4>UAT</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Job</th><th>Trigger</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-uat-migrate</code></td><td>Manual</td><td>Run DB migrations against UAT database</td></tr>
+              <tr><td><code>fdv2-uat-seed-admin</code></td><td>Manual</td><td>Seed superadmin user in UAT</td></tr>
+              <tr><td><code>fdv2-sync-job</code></td><td>Manual / GitHub Actions schedule</td><td>Sync reference data from Snowflake → UAT PostgreSQL</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5. Database ── -->
+    <section class="section" id="database">
+      <div class="section-title"><span class="icon">🗄️</span> 5. Database</div>
+
+      <div class="env-grid">
+        <div class="env-card">
+          <div class="env-card-header prod">🟢 Production — fdv2-postgres</div>
+          <div class="env-card-body">
+            <div class="env-row"><span class="env-label">FQDN</span><span class="env-value"><code style="font-size:10px">fdv2-postgres.postgres.database.azure.com</code></span></div>
+            <div class="env-row"><span class="env-label">Engine</span><span class="env-value">PostgreSQL 16 (16.13)</span></div>
+            <div class="env-row"><span class="env-label">SKU</span><span class="env-value">Standard_D2s_v3 (General Purpose)</span></div>
+            <div class="env-row"><span class="env-label">Storage</span><span class="env-value">128 GiB / P10 / 500 IOPS</span></div>
+            <div class="env-row"><span class="env-label">High availability</span><span class="env-value">Zone redundant (AZ2/AZ1)</span></div>
+            <div class="env-row"><span class="env-label">Backup retention</span><span class="env-value">7 days</span></div>
+            <div class="env-row"><span class="env-label">Geo-redundant backup</span><span class="env-value">Disabled</span></div>
+            <div class="env-row"><span class="env-label">Public access</span><span class="env-value">Disabled</span></div>
+            <div class="env-row"><span class="env-label">Admin login</span><span class="env-value"><code>fdv2admin</code></span></div>
+          </div>
+        </div>
+        <div class="env-card">
+          <div class="env-card-header uat">🟣 UAT — fdv2-uat-postgres</div>
+          <div class="env-card-body">
+            <div class="env-row"><span class="env-label">FQDN</span><span class="env-value"><code style="font-size:10px">fdv2-uat-postgres.postgres.database.azure.com</code></span></div>
+            <div class="env-row"><span class="env-label">Engine</span><span class="env-value">PostgreSQL 16 (16.13)</span></div>
+            <div class="env-row"><span class="env-label">SKU</span><span class="env-value">Standard_B1ms (Burstable)</span></div>
+            <div class="env-row"><span class="env-label">Storage</span><span class="env-value">32 GiB / P4 / 120 IOPS</span></div>
+            <div class="env-row"><span class="env-label">High availability</span><span class="env-value">Disabled</span></div>
+            <div class="env-row"><span class="env-label">Backup retention</span><span class="env-value">7 days</span></div>
+            <div class="env-row"><span class="env-label">Geo-redundant backup</span><span class="env-value">Disabled</span></div>
+            <div class="env-row"><span class="env-label">Public access</span><span class="env-value">Disabled</span></div>
+            <div class="env-row"><span class="env-label">Admin login</span><span class="env-value"><code>fdv2admin</code></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 6. Key Vaults ── -->
+    <section class="section" id="keyvaults">
+      <div class="section-title"><span class="icon">🔑</span> 6. Key Vaults</div>
+      <p>Both vaults use RBAC authorisation (no legacy access policies). Soft-delete enabled with 90-day retention.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Property</th><th><span class="badge badge-prod">Production</span> fdv2-keyvault</th><th><span class="badge badge-uat">UAT</span> fdv2-uat-keyvault</th></tr></thead>
+          <tbody>
+            <tr><td>URI</td><td><code>https://fdv2-keyvault.vault.azure.net/</code></td><td><code>https://fdv2-uat-keyvault.vault.azure.net/</code></td></tr>
+            <tr><td>SKU</td><td>Standard</td><td>Standard</td></tr>
+            <tr><td>RBAC</td><td>Enabled</td><td>Enabled</td></tr>
+            <tr><td>Soft delete</td><td>90 days</td><td>90 days</td></tr>
+            <tr><td>Purge protection</td><td>Not enabled</td><td>Not enabled</td></tr>
+            <tr><td>Private endpoint</td><td><code>fdv2-kv-pe</code> (Approved)</td><td><code>fdv2-uat-kv-pe</code> (Approved)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Production Secrets (names only)</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Secret name</th><th>Used by</th></tr></thead>
+          <tbody>
+            <tr><td><code>DATABASE-URL</code></td><td><code>fdv2-app</code>, <code>fdv2-migrate</code>, <code>fdv2-migrate-prod</code></td></tr>
+            <tr><td><code>JWT-SECRET</code></td><td><code>fdv2-app</code>, <code>fdv2-migrate-prod</code></td></tr>
+            <tr><td><code>ENCRYPTION-KEY</code></td><td><code>fdv2-app</code>, <code>fdv2-migrate-prod</code></td></tr>
+            <tr><td><code>SMTP-HOST</code>, <code>SMTP-PORT</code>, <code>SMTP-USER</code>, <code>SMTP-PASS</code></td><td><code>fdv2-app</code></td></tr>
+            <tr><td><code>event-hub-connection-string</code></td><td><code>fdv2-app</code></td></tr>
+            <tr><td><code>event-hub-storage-connection-string</code></td><td><code>fdv2-app</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── 7. Event Hubs ── -->
+    <section class="section" id="eventhub">
+      <div class="section-title"><span class="icon">📨</span> 7. Event Hubs</div>
+      <div class="alert alert-info">
+        <div class="alert-icon">ℹ️</div>
+        <div class="alert-body"><div class="alert-title">Production only</div>UAT uses the 30-second DB poller (<code>eventSource.js</code>) as the event source. The Event Hub consumer path is not validated in UAT.</div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Property</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Namespace</td><td><code>fdv2-eventhub</code></td></tr>
+            <tr><td>SKU</td><td>Standard — 2 throughput units</td></tr>
+            <tr><td>Kafka surface</td><td>Enabled</td></tr>
+            <tr><td>Zone redundant</td><td>Yes</td></tr>
+            <tr><td>Public network access</td><td><strong>Disabled</strong></td></tr>
+            <tr><td>Private endpoint</td><td><code>fdv2-eventhub-pe</code> (Auto-Approved)</td></tr>
+            <tr><td>Min TLS version</td><td>1.2</td></tr>
+            <tr><td>Event Hub name</td><td><code>oag-flight-alerts</code></td></tr>
+            <tr><td>Partitions</td><td>4</td></tr>
+            <tr><td>Message retention</td><td>7 days</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── 8. Observability ── -->
+    <section class="section" id="observability">
+      <div class="section-title"><span class="icon">📊</span> 8. Observability</div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Resource Group</th><th>Retention</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><code>fdv2-logs</code></td><td><code>fdv2-prod-rg</code></td><td>90 days</td><td><span class="badge badge-prod">Active</span></td></tr>
+            <tr><td><code>fdv2-uat-logs</code></td><td><code>fdv2-uat-rg</code></td><td>30 days</td><td><span class="badge badge-uat">Active</span></td></tr>
+            <tr><td><code>workspace-fdv2uatrgLbuD</code></td><td><code>fdv2-uat-rg</code></td><td>30 days</td><td><span class="badge badge-warn">Orphaned</span></td></tr>
+            <tr><td><code>workspace-fdv2uatrg3Mav</code></td><td><code>fdv2-uat-rg</code></td><td>30 days</td><td><span class="badge badge-warn">Orphaned</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Application Insights &amp; Alerting (Production)</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Resource</th><th>Type</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>fdv2-appinsights</code></td><td>Application Insights</td><td>Linked to <code>fdv2-logs</code> workspace</td></tr>
+            <tr><td><code>fdv2-alerts</code></td><td>Action Group</td><td>Global scope</td></tr>
+            <tr><td><code>fdv2-container-restarts</code></td><td>Metric Alert</td><td>Container restart threshold</td></tr>
+            <tr><td><code>fdv2-high-error-rate</code></td><td>Metric Alert</td><td>HTTP 5xx error rate threshold</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── 9. Identity ── -->
+    <section class="section" id="identity">
+      <div class="section-title"><span class="icon">🔐</span> 9. Identity &amp; Access</div>
+
+      <div class="subsection">
+        <div class="subsection-title">User-Assigned Managed Identities</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Identity</th><th>Client ID</th><th>Used by</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-identity</code> <span class="badge badge-prod">Prod</span></td><td><code>c2fe2b0c-ddb5-486b-a7d7-893e853f6a8e</code></td><td>All prod Container Apps and jobs</td></tr>
+              <tr><td><code>fdv2-uat-identity</code> <span class="badge badge-uat">UAT</span></td><td><code>88b52eda-ab63-41bd-b5bc-872eb6d3dbed</code></td><td>All UAT Container Apps and jobs</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">RBAC Role Assignments — Managed Identities</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Identity</th><th>Role</th><th>Scope</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-identity</code></td><td>Key Vault Secrets User</td><td><code>fdv2-keyvault</code></td></tr>
+              <tr><td><code>fdv2-identity</code></td><td>AcrPull</td><td><code>fdv2acr</code></td></tr>
+              <tr><td><code>fdv2-uat-identity</code></td><td>Key Vault Secrets User</td><td><code>fdv2-uat-keyvault</code></td></tr>
+              <tr><td><code>fdv2-uat-identity</code></td><td>AcrPull</td><td><code>fdv2acr</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">OIDC App Registration — <code>fdv2-github-actions</code></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>App (client) ID</td><td><code>d6f06cd5-5232-4ced-ad19-6a8b5183e6c6</code></td></tr>
+              <tr><td>Service principal ID</td><td><code>40080264-85ab-4e0a-a669-70b89c10c874</code></td></tr>
+              <tr><td>Sign-in audience</td><td>AzureADMyOrg</td></tr>
+              <tr><td>Publisher domain</td><td><code>ergotravelgroup.onmicrosoft.com</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h4>Federated Credentials</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Branch</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>fdv2-github-main</code></td><td><code>main</code></td><td>Production deployments</td></tr>
+              <tr><td><code>github-develop-branch</code></td><td><code>develop</code></td><td>UAT deployments</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="alert alert-warn">
+          <div class="alert-icon">⚠️</div>
+          <div class="alert-body"><div class="alert-title">No explicit scoped role assignment</div>The OIDC service principal has no dedicated Contributor role on the resource groups. Deployments succeed because the workflow runs under the inherited Owner role of <code>ga.nf@ergotravelgroup.onmicrosoft.com</code>. A least-privilege Contributor role scoped to the relevant resource groups should be assigned.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 10. CI/CD ── -->
+    <section class="section" id="cicd">
+      <div class="section-title"><span class="icon">🚀</span> 10. CI/CD (GitHub Actions)</div>
+      <p>Repository: <code>neilfrostergo/flight-delay-v2</code> — workflows in <code>.github/workflows/</code></p>
+
+      <div class="subsection">
+        <div class="subsection-title"><code>deploy-prod.yml</code> — Build and Deploy — Production</div>
+        <p>Trigger: Push to <code>main</code> branch</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Step</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>Checkout source</td></tr>
+              <tr><td>2</td><td>Set up Node.js 20 (npm cache on <code>server/package-lock.json</code>)</td></tr>
+              <tr><td>3</td><td><code>npm ci</code> in <code>server/</code></td></tr>
+              <tr><td>4</td><td><code>npm test --if-present</code> in <code>server/</code></td></tr>
+              <tr><td>5</td><td>Azure OIDC login using <code>AZURE_CLIENT_ID</code>, <code>AZURE_TENANT_ID</code>, <code>AZURE_SUBSCRIPTION_ID</code></td></tr>
+              <tr><td>6</td><td><code>az acr login --name fdv2acr</code></td></tr>
+              <tr><td>7</td><td>Docker build and push tags: <code>&lt;git-sha&gt;</code> and <code>latest</code></td></tr>
+              <tr><td>8</td><td><code>az containerapp update</code> on <code>fdv2-app</code> to the <code>&lt;git-sha&gt;</code> image</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="alert alert-warn">
+          <div class="alert-icon">⚠️</div>
+          <div class="alert-body">No migration step. Migrations must be triggered manually via the <code>fdv2-migrate-prod</code> Container App Job after each deployment.</div>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title"><code>deploy-uat.yml</code> — Build and Deploy — UAT</div>
+        <p>Trigger: Push to <code>develop</code> branch</p>
+        <p>Same steps as production except pushes tags <code>develop-&lt;git-sha&gt;</code> and <code>develop-latest</code>, and updates <code>fdv2-uat-app</code> in <code>fdv2-uat-rg</code>.</p>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title"><code>sync-ref-data.yml</code> — Sync Reference Data (Snowflake → PostgreSQL)</div>
+        <p>Trigger: Scheduled <code>0 3 2 * *</code> (2nd of every month, 03:00 UTC) and <code>workflow_dispatch</code>.</p>
+        <p>Runs two parallel jobs — <code>sync-prod</code> and <code>sync-uat</code> — each triggering the <code>fdv2-sync-job</code> Container App Job in the respective environment. Connects to Snowflake database <code>OAG_SCHEDULES.DIRECT_CUSTOMER_CONFIGURATIONS</code> on <code>ww17050.west-europe.azure</code>.</p>
+      </div>
+
+      <h4>Required GitHub Actions Secrets</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Secret</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td><code>AZURE_CLIENT_ID</code></td><td><code>d6f06cd5-5232-4ced-ad19-6a8b5183e6c6</code></td></tr>
+            <tr><td><code>AZURE_TENANT_ID</code></td><td><code>d5200dfe-1ac0-4607-a991-1d18b6051750</code></td></tr>
+            <tr><td><code>AZURE_SUBSCRIPTION_ID</code></td><td><code>3fc25908-60fa-46ed-9027-6890ee798270</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── 11. Storage ── -->
+    <section class="section" id="storage">
+      <div class="section-title"><span class="icon">💾</span> 11. Storage</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Property</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Name</td><td><code>fdv2prodsa</code></td></tr>
+            <tr><td>Resource group</td><td><code>fdv2-prod-rg</code></td></tr>
+            <tr><td>Kind / SKU</td><td>StorageV2 / Standard_LRS</td></tr>
+            <tr><td>Access tier</td><td>Hot</td></tr>
+            <tr><td>HTTPS only</td><td>Yes</td></tr>
+            <tr><td>Minimum TLS</td><td><span class="badge badge-danger">TLS 1.0</span> — should be upgraded to TLS 1.2</td></tr>
+            <tr><td>Public blob access</td><td>Disabled</td></tr>
+            <tr><td>Network rules</td><td>Default Allow (no firewall)</td></tr>
+            <tr><td>Private endpoints</td><td>None</td></tr>
+            <tr><td>Blob endpoint</td><td><code>https://fdv2prodsa.blob.core.windows.net/</code></td></tr>
+            <tr><td>Purpose</td><td>Event Hub consumer group checkpoint store</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── 12. Communication Services ── -->
+    <section class="section" id="comms">
+      <div class="section-title"><span class="icon">📧</span> 12. Communication Services</div>
+      <div class="alert alert-info">
+        <div class="alert-icon">ℹ️</div>
+        <div class="alert-body"><div class="alert-title">Provisioned but not integrated</div>These resources exist in <code>fdv2-prod-rg</code> but the application still uses SMTP (Nodemailer). They appear to be prepared for a future migration from SMTP to Azure Communication Services.</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Resource</th><th>Type</th><th>Location</th></tr></thead>
+          <tbody>
+            <tr><td><code>fdv2-comms</code></td><td>Azure Communication Services</td><td>global</td></tr>
+            <tr><td><code>fdv2-email</code></td><td>Email Communication Service</td><td>global</td></tr>
+            <tr><td><code>fdv2-email/AzureManagedDomain</code></td><td>Email domain</td><td>global</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── 13. Naming ── -->
+    <section class="section" id="naming">
+      <div class="section-title"><span class="icon">🏷️</span> 13. Resource Naming Conventions</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th><span class="badge badge-prod">Production</span> pattern</th><th><span class="badge badge-uat">UAT</span> pattern</th></tr></thead>
+          <tbody>
+            <tr><td>Resource group</td><td><code>fdv2-prod-rg</code></td><td><code>fdv2-uat-rg</code></td></tr>
+            <tr><td>VNet</td><td><code>fdv2-vnet</code></td><td><code>fdv2-uat-vnet</code></td></tr>
+            <tr><td>Subnet</td><td><code>fdv2-&lt;purpose&gt;-subnet</code></td><td><code>fdv2-uat-&lt;purpose&gt;-subnet</code></td></tr>
+            <tr><td>ACA environment</td><td><code>fdv2-aca-env</code></td><td><code>fdv2-uat-aca-env</code></td></tr>
+            <tr><td>Container App</td><td><code>fdv2-app</code></td><td><code>fdv2-uat-app</code></td></tr>
+            <tr><td>Container App Job</td><td><code>fdv2-&lt;purpose&gt;</code></td><td><code>fdv2-uat-&lt;purpose&gt;</code></td></tr>
+            <tr><td>PostgreSQL</td><td><code>fdv2-postgres</code></td><td><code>fdv2-uat-postgres</code></td></tr>
+            <tr><td>Key Vault</td><td><code>fdv2-keyvault</code></td><td><code>fdv2-uat-keyvault</code></td></tr>
+            <tr><td>Managed identity</td><td><code>fdv2-identity</code></td><td><code>fdv2-uat-identity</code></td></tr>
+            <tr><td>Private endpoint</td><td><code>fdv2-&lt;service&gt;-pe</code></td><td><code>fdv2-uat-&lt;service&gt;-pe</code></td></tr>
+            <tr><td>Storage account</td><td><code>fdv2prodsa</code></td><td>(none)</td></tr>
+            <tr><td>Log Analytics</td><td><code>fdv2-logs</code></td><td><code>fdv2-uat-logs</code></td></tr>
+            <tr><td>ACR</td><td><code>fdv2acr</code></td><td>(shared)</td></tr>
+            <tr><td>Image tags</td><td><code>&lt;git-sha&gt;</code>, <code>latest</code></td><td><code>develop-&lt;git-sha&gt;</code>, <code>develop-latest</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>All resources are tagged with <code>environment: production</code> or <code>environment: uat</code>.</p>
+    </section>
+
+    <!-- ── 14. Gaps ── -->
+    <section class="section" id="gaps">
+      <div class="section-title"><span class="icon">⚠️</span> 14. Gaps &amp; Items Requiring Attention</div>
+
+      <h4>Security</h4>
+      <div class="gap-list">
+        <div class="gap-item security">
+          <div class="gap-label security">Hardcoded credentials in diagnostic jobs</div>
+          <code>fdv2-migrate-diag</code> and <code>fdv2-seed-diag</code> have plaintext database credentials and admin seed passwords embedded in their container environment config. These jobs should be deleted or converted to use Key Vault references (as <code>fdv2-migrate-prod</code> does).
+        </div>
+        <div class="gap-item security">
+          <div class="gap-label security">Storage account TLS version</div>
+          <code>fdv2prodsa</code> has minimum TLS set to 1.0. Should be raised to 1.2 to align with the Event Hub namespace.
+        </div>
+        <div class="gap-item security">
+          <div class="gap-label security">No private endpoint on ACR</div>
+          <code>fdv2acr</code> uses public network access. Container Apps pull images over the public internet.
+        </div>
+        <div class="gap-item security">
+          <div class="gap-label security">GitHub Actions OIDC lacks scoped role assignment</div>
+          The OIDC service principal has no explicit Contributor role on the resource groups — deployments rely on the subscription Owner role inherited from the human admin account. A dedicated least-privilege role should be assigned.
+        </div>
+      </div>
+
+      <h4 style="margin-top:20px">Infrastructure Gaps</h4>
+      <div class="gap-list">
+        <div class="gap-item infra">
+          <div class="gap-label infra">No UAT Event Hub</div>
+          UAT uses the 30-second DB poller instead of Event Hub. The Event Hub consumer code path is never validated before reaching production.
+        </div>
+        <div class="gap-item infra">
+          <div class="gap-label infra">No UAT Front Door / WAF</div>
+          UAT container app environment has public network access enabled with no WAF in front.
+        </div>
+        <div class="gap-item infra">
+          <div class="gap-label infra">No geo-redundant database backups</div>
+          Neither environment has geo-redundant backup enabled. A regional Azure outage would require restoring from the most recent local backup.
+        </div>
+        <div class="gap-item infra">
+          <div class="gap-label infra">Azure Communication Services not integrated</div>
+          <code>fdv2-comms</code> and <code>fdv2-email</code> exist but the application still uses SMTP.
+        </div>
+        <div class="gap-item infra">
+          <div class="gap-label infra">ACR retention policy disabled</div>
+          Images are not automatically purged. Tag count will grow indefinitely.
+        </div>
+        <div class="gap-item infra">
+          <div class="gap-label infra">No automated migration step in CI/CD</div>
+          DB migrations must be triggered manually after each deployment.
+        </div>
+        <div class="gap-item infra">
+          <div class="gap-label infra">Two orphaned Log Analytics workspaces in UAT</div>
+          <code>workspace-fdv2uatrgLbuD</code> and <code>workspace-fdv2uatrg3Mav</code> are leftovers from earlier failed UAT provisioning and can be deleted.
+        </div>
+        <div class="gap-item infra">
+          <div class="gap-label infra">Snowflake credentials for UAT sync job unclear</div>
+          The UAT <code>fdv2-sync-job</code> is triggered by the GitHub Actions workflow but no UAT-specific Snowflake credentials are visible — it may be sharing production Snowflake credentials.
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // Highlight active sidebar link on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('.sidebar nav a');
+
+  function onScroll() {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 80) current = s.id;
+    });
+    links.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+
+</body>
+</html>
