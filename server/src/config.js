@@ -70,7 +70,6 @@ const config = {
   // Leave blank in local development to keep using SMTP/Mailtrap.
   acs: {
     connectionString: optionalEnv('ACS_CONNECTION_STRING', ''),
-    senderAddress:    optionalEnv('ACS_SENDER_ADDRESS', ''),
   },
 
   // Azure Event Hub — production only (ignored in development)

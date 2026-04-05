@@ -28,10 +28,8 @@ function useAcs() {
   return Boolean(config.acs.connectionString);
 }
 
-function acsFromAddress() {
-  // ACS requires a sender address from the provisioned domain.
-  // Falls back to the default Azure-managed domain sender if not explicitly set.
-  return config.acs.senderAddress || 'donotreply@delayedpaid.co.uk';
+function acsSenderDomain() {
+  return 'donotreply@delayedpaid.co.uk';
 }
 
 function smtpFromAddress() {
@@ -444,7 +442,7 @@ async function _send(ctx, subject, html, text, flightRegId, flightEventId, payme
 
   try {
     if (useAcs()) {
-      await _sendViaAcs(to, subject, html, text);
+      await _sendViaAcs(to, subject, html, text, tenant?.name);
     } else {
       await _sendViaSmtp(to, subject, html, text);
     }
@@ -459,10 +457,13 @@ async function _send(ctx, subject, html, text, flightRegId, flightEventId, payme
   }
 }
 
-async function _sendViaAcs(to, subject, html, text) {
+async function _sendViaAcs(to, subject, html, text, tenantName) {
   const client = new EmailClient(config.acs.connectionString);
+  const displayName = tenantName
+    ? `${tenantName} Delayed?Paid! - DoNotReply`
+    : 'Delayed?Paid! - DoNotReply';
   const message = {
-    senderAddress: acsFromAddress(),
+    senderAddress: `${displayName} <${acsSenderDomain()}>`,
     content: { subject, html, plainText: text },
     recipients: { to: [{ address: to }] },
   };
