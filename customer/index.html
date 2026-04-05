@@ -1777,8 +1777,8 @@ const state = {
   setDate('fn', tomorrowStr);
   setDate('rt', tomorrowStr);
 
-  if (portalRestoreSession()) {
-    // Show toggle only — pill shown once session is confirmed by the server in showPortalDash()
+  const hasSession = portalRestoreSession();
+  if (hasSession) {
     document.getElementById('portal-toggle-btn').style.display = '';
   }
 
@@ -1786,6 +1786,11 @@ const state = {
     await consumeUploadToken(uploadToken);
   } else if (token && /^[0-9a-f]{64}$/i.test(token)) {
     await consumeToken(token);
+  } else if (hasSession) {
+    // Saved session found — go straight to the portal dashboard.
+    // showPortalDash() will validate the token server-side; if expired it clears
+    // the session and falls back to the login form automatically.
+    await showPortal();
   } else {
     showStep(1);
   }
