@@ -68,13 +68,22 @@ async function verifyDocument(parsed, registeredFlight) {
 
     let messages;
 
-    if (parsed.parseMethod === 'image' && parsed.base64Image) {
-      // Vision path — use gpt-4o (supports vision), send image directly
+    if (parsed.parseMethod === 'image') {
+      // Vision path — base64Image is set in local dev; in blob mode it's read here
+      let base64Image = parsed.base64Image;
+      if (!base64Image && parsed.blobKey) {
+        const blobStorage = require('./blobStorage');
+        const buf = await blobStorage.downloadToBuffer(parsed.blobKey);
+        base64Image = buf.toString('base64');
+      }
+      if (!base64Image) {
+        return { genuine: null, confidence: null, passengerName: null, reason: 'Image data unavailable' };
+      }
       messages = [{
         role: 'user',
         content: [
           { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: `data:${parsed.imageMime};base64,${parsed.base64Image}`, detail: 'low' } },
+          { type: 'image_url', image_url: { url: `data:${parsed.imageMime};base64,${base64Image}`, detail: 'low' } },
         ],
       }];
     } else if (parsed.rawText) {

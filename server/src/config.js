@@ -72,6 +72,14 @@ const config = {
     connectionString: optionalEnv('ACS_CONNECTION_STRING', ''),
   },
 
+  // Azure Blob Storage — document uploads (UAT + production)
+  // Uses managed identity — no connection string needed.
+  // Leave blank in local development to fall back to local disk storage.
+  blobStorage: {
+    account:   optionalEnv('BLOB_STORAGE_ACCOUNT', ''),
+    container: optionalEnv('BLOB_STORAGE_CONTAINER', 'claim-documents'),
+  },
+
   // Azure OpenAI — document verification via managed identity (UAT + production)
   // Leave blank in local development to skip AI verification.
   azureOpenAI: {

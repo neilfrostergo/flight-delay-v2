@@ -15,6 +15,7 @@ const { getOrCreateSubscription }          = require('../services/oagAlerts');
 const { validatePolicy }                   = require('../services/policyValidator');
 const { triggerDeferredPayment }           = require('../services/delayProcessor');
 const { verifyDocument }                   = require('../services/documentVerifier');
+const blob                                 = require('../services/blobStorage');
 
 const router = express.Router();
 
@@ -348,9 +349,28 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
 
   const doc = docResult.rows[0];
 
+  // ── Upload to blob storage (replaces local file in UAT/prod) ──────────────
+  const blobKey  = blob.blobName(registrationId, req.file.filename);
+  const blobUrl  = await blob.uploadFile(req.file.path, blobKey, req.file.mimetype);
+  if (blobUrl) {
+    await query(`UPDATE registration_documents SET blob_url = $1 WHERE id = $2`, [blobUrl, doc.id]);
+  }
+  // If blob upload succeeded, req.file.path is deleted. parseDocument will
+  // read from blob; if not available (local dev), local path still exists.
+
   // ── Synchronous document analysis ─────────────────────────────────────────
   try {
-    const parsed = await parseDocument(req.file.path, req.file.mimetype);
+    // In blob mode, download to a temp path for pdf-parse (needs a file path)
+    let filePath = req.file.path;
+    if (blob.isAvailable()) {
+      const os   = require('os');
+      const tmp  = path.join(os.tmpdir(), req.file.filename);
+      await blob.downloadToTemp(blobKey, tmp);
+      filePath = tmp;
+    }
+    const parsed = await parseDocument(filePath, req.file.mimetype);
+    // Clean up temp file
+    if (blob.isAvailable()) fs.unlink(filePath, () => {});
 
     // Fetch all flights on this registration for matching
     const allFlights = await query(
@@ -359,6 +379,9 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
        WHERE fr.registration_id = $1`,
       [registrationId]
     );
+
+    // Attach blob key so verifier can fetch image data if needed
+    parsed.blobKey = blobKey;
 
     const matchResult = matchFlights(parsed, allFlights.rows);
 
@@ -573,13 +596,17 @@ router.delete('/flights/:flightId', requireCustomer, async (req, res) => {
     return res.status(409).json({ error: 'This flight has already been paid out and cannot be removed' });
   }
 
-  // Delete linked documents from disk and DB
+  // Delete linked documents from storage and DB
   const docs = await query(
     `DELETE FROM registration_documents WHERE flight_registration_id = $1 RETURNING stored_name`,
     [flightId]
   );
   for (const doc of docs.rows) {
-    fs.unlink(path.join(UPLOADS_DIR, String(registrationId), doc.stored_name), () => {});
+    if (blob.isAvailable()) {
+      blob.deleteBlob(blob.blobName(registrationId, doc.stored_name));
+    } else {
+      fs.unlink(path.join(UPLOADS_DIR, String(registrationId), doc.stored_name), () => {});
+    }
   }
 
   await query(`DELETE FROM flight_registrations WHERE id = $1`, [flightId]);
