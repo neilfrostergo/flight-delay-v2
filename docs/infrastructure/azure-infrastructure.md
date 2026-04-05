@@ -62,7 +62,16 @@ All flight-delay-v2 resources live in the **AI Corp Landing Zone** subscription.
 | `fdv2-vnet` | `fdv2-prod-rg` | `10.100.0.0/16` | 3 (see below) |
 | `fdv2-uat-vnet` | `fdv2-uat-rg` | `10.101.0.0/16` | 3 (see below) |
 
-No VNet peerings are configured between production and UAT.
+**VNet Peerings (hub-spoke topology):**
+
+| Peering name | From | To | State |
+|---|---|---|---|
+| `peer-fdv2-prod-to-hub` | `fdv2-vnet` | `vnet-ERGO-hub-uks` (connectivity sub) | Connected |
+| `peer-hub-to-fdv2-prod` | `vnet-ERGO-hub-uks` | `fdv2-vnet` | Connected |
+| `peer-fdv2-uat-to-hub` | `fdv2-uat-vnet` | `vnet-ERGO-hub-uks` (connectivity sub) | Connected |
+| `peer-hub-to-fdv2-uat` | `vnet-ERGO-hub-uks` | `fdv2-uat-vnet` | Connected |
+
+Both fdv2 VNets are peered into the ERGO corporate hub (`vnet-ERGO-hub-uks`, `10.0.0.0/16`, connectivity subscription `3ce96a93`). The hub is in turn peered to `vnet-ERGO-corp-uks` (`10.1.0.0/16`, AI Corp Landing Zone subscription `3fc25908`) where the Azure OpenAI private endpoint lives. This gives Container Apps private connectivity to `oai-ERGO-corp-uks` without traversing the public internet.
 
 #### Production VNet Subnets (`fdv2-vnet`)
 
@@ -99,14 +108,18 @@ UAT does **not** use a NAT gateway; outbound traffic uses the shared ACA environ
 
 The production ACA environment itself also accepts an inbound private endpoint connection from Azure Front Door (see Front Door section).
 
-### Private DNS Zones (Production)
+### Private DNS Zones
 
-| Zone | Purpose |
-|------|---------|
-| `fdv2-postgres.private.postgres.database.azure.com` | PostgreSQL flexible server resolution |
-| `postgres.database.azure.com` | Additional PostgreSQL DNS (legacy, from earlier setup) |
-| `privatelink.vaultcore.azure.net` | Key Vault private endpoint resolution |
-| `privatelink.servicebus.windows.net` | Event Hub private endpoint resolution |
+| Zone | Subscription | Resource Group | Linked VNets |
+|------|-------------|---------------|--------------|
+| `fdv2-postgres.private.postgres.database.azure.com` | AI Corp LZ | `fdv2-prod-rg` | `fdv2-vnet` |
+| `postgres.database.azure.com` | AI Corp LZ | `fdv2-prod-rg` | `fdv2-vnet` |
+| `privatelink.vaultcore.azure.net` | AI Corp LZ | `fdv2-prod-rg` | `fdv2-vnet`, `fdv2-uat-vnet` |
+| `privatelink.servicebus.windows.net` | AI Corp LZ | `fdv2-prod-rg` | `fdv2-vnet` |
+| `privatelink.openai.azure.com` | connectivity | `rg-ergo-private-dns` | `vnet-ERGO-hub-uks`, `fdv2-vnet`, `fdv2-uat-vnet` |
+| `privatelink.cognitiveservices.azure.com` | connectivity | `rg-ergo-private-dns` | `vnet-ERGO-hub-uks`, `fdv2-vnet`, `fdv2-uat-vnet` |
+
+The OpenAI private DNS zones are managed in the connectivity subscription and were linked to both fdv2 VNets to enable DNS resolution of `oai-ergo-corp-uks.openai.azure.com` to its private IP.
 
 ### DNS — Public Zone
 
@@ -454,8 +467,12 @@ The connection string for this hub is stored in Key Vault as `event-hub-connecti
 |----------|------|-------|
 | `fdv2-identity` | Key Vault Secrets User | `fdv2-keyvault` |
 | `fdv2-identity` | AcrPull | `fdv2acr` |
+| `fdv2-identity` | Storage Blob Data Contributor | `fdv2prodsa` |
+| `fdv2-identity` | Cognitive Services OpenAI User | `oai-ERGO-corp-uks` |
 | `fdv2-uat-identity` | Key Vault Secrets User | `fdv2-uat-keyvault` |
 | `fdv2-uat-identity` | AcrPull | `fdv2acr` |
+| `fdv2-uat-identity` | Storage Blob Data Contributor | `fdv2uatsa` |
+| `fdv2-uat-identity` | Cognitive Services OpenAI User | `oai-ERGO-corp-uks` |
 
 ### OIDC App Registration — `fdv2-github-actions`
 
@@ -553,16 +570,44 @@ This triggers the `fdv2-sync-job` Container App Job in each environment, which c
 | Access tier | Hot |
 | Location | UK South |
 | HTTPS only | Yes |
-| Minimum TLS | **TLS 1.0** (should be upgraded to TLS 1.2) |
+| Minimum TLS | TLS 1.2 |
 | Public blob access | Disabled |
 | Cross-tenant replication | Disabled |
 | Network rules | Default Allow (no firewall rules configured) |
 | Private endpoints | None |
 
-**Blob endpoint:** `https://fdv2prodsa.blob.core.windows.net/`  
-**Purpose:** Used as the Event Hub consumer group checkpoint store (connection string stored in Key Vault as `event-hub-storage-connection-string`).
+**Blob endpoint:** `https://fdv2prodsa.blob.core.windows.net/`
 
-**Known issue:** Minimum TLS version is set to TLS 1.0 — should be raised to TLS 1.2 to align with the Event Hub namespace setting and security best practice.
+**Containers:**
+
+| Container | Purpose | Access |
+|-----------|---------|--------|
+| `event-hub-checkpoints` | Event Hub consumer group checkpointing | Private — connection string in Key Vault |
+| `claim-documents` | Customer-uploaded booking confirmations and e-tickets for claims | Private — managed identity only |
+
+**Lifecycle policy:** Blobs in `claim-documents` are automatically deleted 395 days (13 months) after last modification. This satisfies UK GDPR retention requirements for claim evidence.
+
+---
+
+### UAT — `fdv2uatsa`
+
+| Property | Value |
+|----------|-------|
+| Resource group | `fdv2-uat-rg` |
+| Kind | StorageV2 (general purpose v2) |
+| SKU | Standard_LRS |
+| Access tier | Hot |
+| Location | UK South |
+| Minimum TLS | TLS 1.2 |
+| Public blob access | Disabled |
+
+**Containers:**
+
+| Container | Purpose |
+|-----------|---------|
+| `claim-documents` | UAT customer document uploads |
+
+**Lifecycle policy:** Same 395-day auto-deletion policy as production.
 
 ---
 
@@ -572,13 +617,58 @@ This triggers the `fdv2-sync-job` Container App Job in each environment, which c
 |----------|------|---------------|---------|
 | `fdv2-comms` | Azure Communication Services | `fdv2-prod-rg` | global |
 | `fdv2-email` | Email Communication Service | `fdv2-prod-rg` | global |
-| `fdv2-email/AzureManagedDomain` | Email domain | `fdv2-prod-rg` | global |
+| `fdv2-email/delayedpaid.co.uk` | Custom email domain | `fdv2-prod-rg` | global |
 
-These resources are provisioned but the application currently uses SMTP (Nodemailer) for customer email notifications. The ACS/Email resources appear to be infrastructure set up in anticipation of migrating from SMTP to Azure Communication Services, but the integration has not yet been implemented in the application code.
+**Email domain:** `donotreply@delayedpaid.co.uk`  
+**Sender display name:** `Delayed?Paid! - DoNotReply` (configured on the sender username resource)
+
+**Domain verification status:** Domain ✓, SPF ✓, DKIM ✓, DKIM2 ✓ (DMARC pending)
+
+The application uses ACS for all outbound email in UAT and production environments. The `ACS_CONNECTION_STRING` is stored in Key Vault and injected via secret reference. Local development falls back to SMTP/Mailtrap when `ACS_CONNECTION_STRING` is not set.
+
+**Dev email override:** `DEV_EMAIL_OVERRIDE` is set on both UAT and production container apps via Key Vault secret. In UAT this routes all outbound email to a single address regardless of the policy holder's email.
 
 ---
 
-## 13. Resource Naming Conventions
+## 13. AI Services
+
+### Azure OpenAI — `oai-ERGO-corp-uks`
+
+| Property | Value |
+|----------|-------|
+| Resource group | `rg-ERGO-corp-ai` (AI Corp Landing Zone subscription) |
+| Location | UK South |
+| Public network access | **Disabled** — private endpoint only |
+| Private endpoint | `pe-oai-corp` in `snet-private-endpoints` (`vnet-ERGO-corp-uks`) |
+
+**Deployed models:**
+
+| Deployment name | Model | Version | Capacity | Used for |
+|----------------|-------|---------|----------|---------|
+| `gpt4o-prd` | gpt-4o | 2024-11-20 | 80K TPM | Document vision (image uploads) |
+| `gpt-4o-mini-prd` | gpt-4o-mini | 2024-07-18 | 120K TPM | Document text verification |
+| `embed-large` | text-embedding-3-large | 1 | 120K TPM | (Available, not currently used) |
+| `embed-small` | text-embedding-3-small | 1 | 120K TPM | (Available, not currently used) |
+
+**How the application uses it:**
+
+When a customer uploads a booking confirmation or e-ticket, the document is analysed by AI to verify authenticity before a payout is released:
+
+- **PDF uploads:** Text extracted by `pdf-parse`, then sent to `gpt-4o-mini` for authenticity assessment
+- **Image uploads (JPEG/PNG):** Image sent directly to `gpt-4o` using the vision API
+- **Result:** `genuine` (boolean), `confidence` (high/medium), `passengerName` (for name-matching), `reason` stored on the `registration_documents` record
+- **Rejected documents** (`genuine: false`, `confidence: high`) set `match_status = 'rejected'` and block payment
+- **AI unavailable** (local dev, network error) — falls through gracefully without blocking payment
+
+**Authentication:** Managed identity (`fdv2-identity` / `fdv2-uat-identity`) with `Cognitive Services OpenAI User` role. No API keys used.
+
+**Network path:** Container App → `fdv2-vnet`/`fdv2-uat-vnet` → peering → `vnet-ERGO-hub-uks` → peering → `vnet-ERGO-corp-uks` → private endpoint → `oai-ERGO-corp-uks`. DNS resolves via `privatelink.openai.azure.com` private zone linked to both fdv2 VNets.
+
+**GDPR note:** Data is processed within the ERGO Azure tenant (UK South). Microsoft's Data Processing Agreement applies. API data is not used to train models per Microsoft's enterprise terms. Only structured document text / image data is sent — no bank details, policy API keys, or other secrets.
+
+---
+
+## 14. Resource Naming Conventions
 
 | Component | Production pattern | UAT pattern |
 |-----------|-------------------|-------------|
@@ -592,7 +682,7 @@ These resources are provisioned but the application currently uses SMTP (Nodemai
 | Key Vault | `fdv2-keyvault` | `fdv2-uat-keyvault` |
 | Managed identity | `fdv2-identity` | `fdv2-uat-identity` |
 | Private endpoint | `fdv2-<service>-pe` | `fdv2-uat-<service>-pe` |
-| Storage account | `fdv2prodsa` | (no UAT storage account) |
+| Storage account | `fdv2prodsa` | `fdv2uatsa` |
 | Log Analytics | `fdv2-logs` | `fdv2-uat-logs` |
 | ACR | `fdv2acr` | (shared with production) |
 | Image tags (prod) | `<git-sha>`, `latest` | `develop-<git-sha>`, `develop-latest` |
@@ -601,12 +691,11 @@ All resources are tagged with `environment: production` or `environment: uat`.
 
 ---
 
-## 14. Gaps / Items Not Yet Provisioned or Requiring Attention
+## 15. Gaps / Items Not Yet Provisioned or Requiring Attention
 
 ### Security
 
 - **`fdv2-migrate-diag` and `fdv2-seed-diag` jobs** contain hardcoded plaintext database credentials and an admin seed password directly in their container environment configuration. These diagnostic jobs should be deleted or migrated to use Key Vault references (as `fdv2-migrate-prod` does).
-- **Storage account TLS version**: `fdv2prodsa` uses TLS 1.0 as minimum — should be raised to TLS 1.2.
 - **ACR has no private endpoint**: `fdv2acr` uses public network access. Container Apps pull images over the public internet. Consider adding a private endpoint if network-level isolation for image pulls is required.
 - **GitHub Actions service principal has no explicit scoped role assignment**: The OIDC principal currently relies on the subscription Owner role inherited from the human user session rather than a dedicated, least-privilege Contributor role on the relevant resource groups.
 
@@ -615,8 +704,8 @@ All resources are tagged with `environment: production` or `environment: uat`.
 - **No UAT Event Hub**: UAT uses the 30-second DB polling loop (`eventSource.js`) rather than Event Hub. This means UAT does not validate the Event Hub consumer path end-to-end.
 - **No UAT Front Door / WAF**: UAT container app environment has public network access enabled with no WAF in front.
 - **No geo-redundant backups**: Neither production nor UAT PostgreSQL has geo-redundant backup enabled. A regional Azure outage would require restoring from the most recent local backup.
-- **Azure Communication Services not integrated**: `fdv2-comms` and `fdv2-email` resources exist but are not wired up in the application; email still goes via SMTP.
 - **ACR retention policy disabled**: Images are not automatically purged. Tag count will grow indefinitely unless a purge policy or lifecycle rule is added.
-- **No scheduled migration job**: DB migrations must be triggered manually after each deployment. There is no automation to run `fdv2-migrate-prod` as part of the CI/CD pipeline.
+- **No automated migration step in CI/CD**: DB migrations run automatically on container startup (via `CMD` in Dockerfile), but there is no explicit migration step in the GitHub Actions workflow. If a migration fails at startup the container will crash-loop rather than surface a clear pipeline error.
 - **Two orphaned Log Analytics workspaces in UAT** (`workspace-fdv2uatrgLbuD`, `workspace-fdv2uatrg3Mav`) from earlier failed provisioning — can be deleted.
 - **Snowflake connectivity for UAT `fdv2-sync-job`**: The UAT sync job is triggered by the GitHub Actions workflow but no UAT-specific Snowflake credentials are visible; it may be sharing production Snowflake credentials.
+- **DMARC not yet verified**: `_dmarc.delayedpaid.co.uk` TXT record is in place but ACS verification is still pending. No functional impact on email delivery but completes the SPF/DKIM/DMARC trifecta.

@@ -348,8 +348,9 @@
       <a href="#cicd">10. CI/CD</a>
       <a href="#storage">11. Storage</a>
       <a href="#comms">12. Communication Services</a>
-      <a href="#naming">13. Naming Conventions</a>
-      <a href="#gaps">14. Gaps &amp; Issues</a>
+      <a href="#ai">13. AI Services</a>
+      <a href="#naming">14. Naming Conventions</a>
+      <a href="#gaps">15. Gaps &amp; Issues</a>
     </nav>
   </aside>
 
@@ -457,7 +458,19 @@
             </tbody>
           </table>
         </div>
-        <p>No VNet peerings are configured between production and UAT.</p>
+        <p><strong>VNet Peerings (hub-spoke topology):</strong></p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Peering name</th><th>From</th><th>To</th><th>State</th></tr></thead>
+            <tbody>
+              <tr><td><code>peer-fdv2-prod-to-hub</code></td><td><code>fdv2-vnet</code></td><td><code>vnet-ERGO-hub-uks</code> (connectivity sub)</td><td><span class="badge badge-prod">Connected</span></td></tr>
+              <tr><td><code>peer-hub-to-fdv2-prod</code></td><td><code>vnet-ERGO-hub-uks</code></td><td><code>fdv2-vnet</code></td><td><span class="badge badge-prod">Connected</span></td></tr>
+              <tr><td><code>peer-fdv2-uat-to-hub</code></td><td><code>fdv2-uat-vnet</code></td><td><code>vnet-ERGO-hub-uks</code> (connectivity sub)</td><td><span class="badge badge-prod">Connected</span></td></tr>
+              <tr><td><code>peer-hub-to-fdv2-uat</code></td><td><code>vnet-ERGO-hub-uks</code></td><td><code>fdv2-uat-vnet</code></td><td><span class="badge badge-prod">Connected</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Both fdv2 VNets are peered into the ERGO corporate hub (<code>vnet-ERGO-hub-uks</code>, <code>10.0.0.0/16</code>, connectivity subscription <code>3ce96a93</code>). The hub is in turn peered to <code>vnet-ERGO-corp-uks</code> (<code>10.1.0.0/16</code>, AI Corp Landing Zone subscription <code>3fc25908</code>) where the Azure OpenAI private endpoint lives. This gives Container Apps private connectivity to <code>oai-ERGO-corp-uks</code> without traversing the public internet.</p>
 
         <h4>Production VNet Subnets (<code>fdv2-vnet</code>)</h4>
         <div class="table-wrap">
@@ -512,18 +525,21 @@
         </div>
         <p>The production ACA environment also accepts an inbound private endpoint connection from Azure Front Door.</p>
 
-        <h4>Private DNS Zones (Production)</h4>
+        <h4>Private DNS Zones</h4>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Zone</th><th>Purpose</th></tr></thead>
+            <thead><tr><th>Zone</th><th>Subscription</th><th>Resource Group</th><th>Linked VNets</th></tr></thead>
             <tbody>
-              <tr><td><code>fdv2-postgres.private.postgres.database.azure.com</code></td><td>PostgreSQL flexible server resolution</td></tr>
-              <tr><td><code>postgres.database.azure.com</code></td><td>Additional PostgreSQL DNS (legacy)</td></tr>
-              <tr><td><code>privatelink.vaultcore.azure.net</code></td><td>Key Vault private endpoint resolution</td></tr>
-              <tr><td><code>privatelink.servicebus.windows.net</code></td><td>Event Hub private endpoint resolution</td></tr>
+              <tr><td><code>fdv2-postgres.private.postgres.database.azure.com</code></td><td>AI Corp LZ</td><td><code>fdv2-prod-rg</code></td><td><code>fdv2-vnet</code></td></tr>
+              <tr><td><code>postgres.database.azure.com</code></td><td>AI Corp LZ</td><td><code>fdv2-prod-rg</code></td><td><code>fdv2-vnet</code></td></tr>
+              <tr><td><code>privatelink.vaultcore.azure.net</code></td><td>AI Corp LZ</td><td><code>fdv2-prod-rg</code></td><td><code>fdv2-vnet</code>, <code>fdv2-uat-vnet</code></td></tr>
+              <tr><td><code>privatelink.servicebus.windows.net</code></td><td>AI Corp LZ</td><td><code>fdv2-prod-rg</code></td><td><code>fdv2-vnet</code></td></tr>
+              <tr><td><code>privatelink.openai.azure.com</code></td><td>connectivity</td><td><code>rg-ergo-private-dns</code></td><td><code>vnet-ERGO-hub-uks</code>, <code>fdv2-vnet</code>, <code>fdv2-uat-vnet</code></td></tr>
+              <tr><td><code>privatelink.cognitiveservices.azure.com</code></td><td>connectivity</td><td><code>rg-ergo-private-dns</code></td><td><code>vnet-ERGO-hub-uks</code>, <code>fdv2-vnet</code>, <code>fdv2-uat-vnet</code></td></tr>
             </tbody>
           </table>
         </div>
+        <p>The OpenAI private DNS zones are managed in the connectivity subscription and were linked to both fdv2 VNets to enable DNS resolution of <code>oai-ergo-corp-uks.openai.azure.com</code> to its private IP.</p>
       </div>
 
       <div class="subsection" id="dns">
@@ -869,8 +885,12 @@
             <tbody>
               <tr><td><code>fdv2-identity</code></td><td>Key Vault Secrets User</td><td><code>fdv2-keyvault</code></td></tr>
               <tr><td><code>fdv2-identity</code></td><td>AcrPull</td><td><code>fdv2acr</code></td></tr>
+              <tr><td><code>fdv2-identity</code></td><td>Storage Blob Data Contributor</td><td><code>fdv2prodsa</code></td></tr>
+              <tr><td><code>fdv2-identity</code></td><td>Cognitive Services OpenAI User</td><td><code>oai-ERGO-corp-uks</code></td></tr>
               <tr><td><code>fdv2-uat-identity</code></td><td>Key Vault Secrets User</td><td><code>fdv2-uat-keyvault</code></td></tr>
               <tr><td><code>fdv2-uat-identity</code></td><td>AcrPull</td><td><code>fdv2acr</code></td></tr>
+              <tr><td><code>fdv2-uat-identity</code></td><td>Storage Blob Data Contributor</td><td><code>fdv2uatsa</code></td></tr>
+              <tr><td><code>fdv2-uat-identity</code></td><td>Cognitive Services OpenAI User</td><td><code>oai-ERGO-corp-uks</code></td></tr>
             </tbody>
           </table>
         </div>
@@ -963,48 +983,145 @@
     <!-- ── 11. Storage ── -->
     <section class="section" id="storage">
       <div class="section-title"><span class="icon">💾</span> 11. Storage</div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Property</th><th>Value</th></tr></thead>
-          <tbody>
-            <tr><td>Name</td><td><code>fdv2prodsa</code></td></tr>
-            <tr><td>Resource group</td><td><code>fdv2-prod-rg</code></td></tr>
-            <tr><td>Kind / SKU</td><td>StorageV2 / Standard_LRS</td></tr>
-            <tr><td>Access tier</td><td>Hot</td></tr>
-            <tr><td>HTTPS only</td><td>Yes</td></tr>
-            <tr><td>Minimum TLS</td><td><span class="badge badge-danger">TLS 1.0</span> — should be upgraded to TLS 1.2</td></tr>
-            <tr><td>Public blob access</td><td>Disabled</td></tr>
-            <tr><td>Network rules</td><td>Default Allow (no firewall)</td></tr>
-            <tr><td>Private endpoints</td><td>None</td></tr>
-            <tr><td>Blob endpoint</td><td><code>https://fdv2prodsa.blob.core.windows.net/</code></td></tr>
-            <tr><td>Purpose</td><td>Event Hub consumer group checkpoint store</td></tr>
-          </tbody>
-        </table>
+
+      <div class="subsection">
+        <div class="subsection-title">Production — <code>fdv2prodsa</code></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Resource group</td><td><code>fdv2-prod-rg</code></td></tr>
+              <tr><td>Kind / SKU</td><td>StorageV2 / Standard_LRS</td></tr>
+              <tr><td>Access tier</td><td>Hot</td></tr>
+              <tr><td>Location</td><td>UK South</td></tr>
+              <tr><td>HTTPS only</td><td>Yes</td></tr>
+              <tr><td>Minimum TLS</td><td>TLS 1.2</td></tr>
+              <tr><td>Public blob access</td><td>Disabled</td></tr>
+              <tr><td>Cross-tenant replication</td><td>Disabled</td></tr>
+              <tr><td>Network rules</td><td>Default Allow (no firewall)</td></tr>
+              <tr><td>Private endpoints</td><td>None</td></tr>
+              <tr><td>Blob endpoint</td><td><code>https://fdv2prodsa.blob.core.windows.net/</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>Containers</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Container</th><th>Purpose</th><th>Access</th></tr></thead>
+            <tbody>
+              <tr><td><code>event-hub-checkpoints</code></td><td>Event Hub consumer group checkpointing</td><td>Private — connection string in Key Vault</td></tr>
+              <tr><td><code>claim-documents</code></td><td>Customer-uploaded booking confirmations and e-tickets for claims</td><td>Private — managed identity only</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Blobs in <code>claim-documents</code> are automatically deleted 395 days (13 months) after last modification via a lifecycle policy. This satisfies UK GDPR retention requirements for claim evidence.</p>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">UAT — <code>fdv2uatsa</code></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Resource group</td><td><code>fdv2-uat-rg</code></td></tr>
+              <tr><td>Kind / SKU</td><td>StorageV2 / Standard_LRS</td></tr>
+              <tr><td>Access tier</td><td>Hot</td></tr>
+              <tr><td>Location</td><td>UK South</td></tr>
+              <tr><td>Minimum TLS</td><td>TLS 1.2</td></tr>
+              <tr><td>Public blob access</td><td>Disabled</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>Containers</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Container</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>claim-documents</code></td><td>UAT customer document uploads</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Same 395-day auto-deletion lifecycle policy as production.</p>
       </div>
     </section>
 
     <!-- ── 12. Communication Services ── -->
     <section class="section" id="comms">
       <div class="section-title"><span class="icon">📧</span> 12. Communication Services</div>
-      <div class="alert alert-info">
-        <div class="alert-icon">ℹ️</div>
-        <div class="alert-body"><div class="alert-title">Provisioned but not integrated</div>These resources exist in <code>fdv2-prod-rg</code> but the application still uses SMTP (Nodemailer). They appear to be prepared for a future migration from SMTP to Azure Communication Services.</div>
-      </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Resource</th><th>Type</th><th>Location</th></tr></thead>
+          <thead><tr><th>Resource</th><th>Type</th><th>Resource Group</th><th>Location</th></tr></thead>
           <tbody>
-            <tr><td><code>fdv2-comms</code></td><td>Azure Communication Services</td><td>global</td></tr>
-            <tr><td><code>fdv2-email</code></td><td>Email Communication Service</td><td>global</td></tr>
-            <tr><td><code>fdv2-email/AzureManagedDomain</code></td><td>Email domain</td><td>global</td></tr>
+            <tr><td><code>fdv2-comms</code></td><td>Azure Communication Services</td><td><code>fdv2-prod-rg</code></td><td>global</td></tr>
+            <tr><td><code>fdv2-email</code></td><td>Email Communication Service</td><td><code>fdv2-prod-rg</code></td><td>global</td></tr>
+            <tr><td><code>fdv2-email/delayedpaid.co.uk</code></td><td>Custom email domain</td><td><code>fdv2-prod-rg</code></td><td>global</td></tr>
           </tbody>
         </table>
       </div>
+      <p><strong>Email domain:</strong> <code>donotreply@delayedpaid.co.uk</code><br>
+      <strong>Sender display name:</strong> <code>Delayed?Paid! - DoNotReply</code> (configured on the sender username resource)</p>
+      <p><strong>Domain verification status:</strong> Domain ✓, SPF ✓, DKIM ✓, DKIM2 ✓ (DMARC pending)</p>
+      <p>The application uses ACS for all outbound email in UAT and production environments. The <code>ACS_CONNECTION_STRING</code> is stored in Key Vault and injected via secret reference. Local development falls back to SMTP/Mailtrap when <code>ACS_CONNECTION_STRING</code> is not set.</p>
+      <p><strong>Dev email override:</strong> <code>DEV_EMAIL_OVERRIDE</code> is set on both UAT and production container apps via Key Vault secret. In UAT this routes all outbound email to a single address regardless of the policy holder's email.</p>
     </section>
 
-    <!-- ── 13. Naming ── -->
+    <!-- ── 13. AI Services ── -->
+    <section class="section" id="ai">
+      <div class="section-title"><span class="icon">🤖</span> 13. AI Services</div>
+
+      <div class="subsection">
+        <div class="subsection-title">Azure OpenAI — <code>oai-ERGO-corp-uks</code></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Resource group</td><td><code>rg-ERGO-corp-ai</code> (AI Corp Landing Zone subscription)</td></tr>
+              <tr><td>Location</td><td>UK South</td></tr>
+              <tr><td>Public network access</td><td><strong>Disabled</strong> — private endpoint only</td></tr>
+              <tr><td>Private endpoint</td><td><code>pe-oai-corp</code> in <code>snet-private-endpoints</code> (<code>vnet-ERGO-corp-uks</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>Deployed Models</h4>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Deployment name</th><th>Model</th><th>Version</th><th>Capacity</th><th>Used for</th></tr></thead>
+            <tbody>
+              <tr><td><code>gpt4o-prd</code></td><td>gpt-4o</td><td>2024-11-20</td><td>80K TPM</td><td>Document vision (image uploads)</td></tr>
+              <tr><td><code>gpt-4o-mini-prd</code></td><td>gpt-4o-mini</td><td>2024-07-18</td><td>120K TPM</td><td>Document text verification</td></tr>
+              <tr><td><code>embed-large</code></td><td>text-embedding-3-large</td><td>1</td><td>120K TPM</td><td>(Available, not currently used)</td></tr>
+              <tr><td><code>embed-small</code></td><td>text-embedding-3-small</td><td>1</td><td>120K TPM</td><td>(Available, not currently used)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>How the Application Uses It</h4>
+        <p>When a customer uploads a booking confirmation or e-ticket, the document is analysed by AI to verify authenticity before a payout is released:</p>
+        <ul>
+          <li><strong>PDF uploads:</strong> Text extracted by <code>pdf-parse</code>, then sent to <code>gpt-4o-mini</code> for authenticity assessment</li>
+          <li><strong>Image uploads (JPEG/PNG):</strong> Image sent directly to <code>gpt-4o</code> using the vision API</li>
+          <li><strong>Result:</strong> <code>genuine</code> (boolean), <code>confidence</code> (high/medium), <code>passengerName</code> (for name-matching), <code>reason</code> stored on the <code>registration_documents</code> record</li>
+          <li><strong>Rejected documents</strong> (<code>genuine: false</code>, <code>confidence: high</code>) set <code>match_status = 'rejected'</code> and block payment</li>
+          <li><strong>AI unavailable</strong> (local dev, network error) — falls through gracefully without blocking payment</li>
+        </ul>
+
+        <h4>Authentication &amp; Network Path</h4>
+        <p><strong>Authentication:</strong> Managed identity (<code>fdv2-identity</code> / <code>fdv2-uat-identity</code>) with <code>Cognitive Services OpenAI User</code> role. No API keys used.</p>
+        <p><strong>Network path:</strong> Container App → <code>fdv2-vnet</code>/<code>fdv2-uat-vnet</code> → peering → <code>vnet-ERGO-hub-uks</code> → peering → <code>vnet-ERGO-corp-uks</code> → private endpoint → <code>oai-ERGO-corp-uks</code>. DNS resolves via <code>privatelink.openai.azure.com</code> private zone linked to both fdv2 VNets.</p>
+
+        <div class="alert alert-info">
+          <div class="alert-icon">ℹ️</div>
+          <div class="alert-body"><div class="alert-title">GDPR Note</div>Data is processed within the ERGO Azure tenant (UK South). Microsoft's Data Processing Agreement applies. API data is not used to train models per Microsoft's enterprise terms. Only structured document text / image data is sent — no bank details, policy API keys, or other secrets.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 14. Naming ── -->
     <section class="section" id="naming">
-      <div class="section-title"><span class="icon">🏷️</span> 13. Resource Naming Conventions</div>
+      <div class="section-title"><span class="icon">🏷️</span> 14. Resource Naming Conventions</div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Component</th><th><span class="badge badge-prod">Production</span> pattern</th><th><span class="badge badge-uat">UAT</span> pattern</th></tr></thead>
@@ -1019,7 +1136,7 @@
             <tr><td>Key Vault</td><td><code>fdv2-keyvault</code></td><td><code>fdv2-uat-keyvault</code></td></tr>
             <tr><td>Managed identity</td><td><code>fdv2-identity</code></td><td><code>fdv2-uat-identity</code></td></tr>
             <tr><td>Private endpoint</td><td><code>fdv2-&lt;service&gt;-pe</code></td><td><code>fdv2-uat-&lt;service&gt;-pe</code></td></tr>
-            <tr><td>Storage account</td><td><code>fdv2prodsa</code></td><td>(none)</td></tr>
+            <tr><td>Storage account</td><td><code>fdv2prodsa</code></td><td><code>fdv2uatsa</code></td></tr>
             <tr><td>Log Analytics</td><td><code>fdv2-logs</code></td><td><code>fdv2-uat-logs</code></td></tr>
             <tr><td>ACR</td><td><code>fdv2acr</code></td><td>(shared)</td></tr>
             <tr><td>Image tags</td><td><code>&lt;git-sha&gt;</code>, <code>latest</code></td><td><code>develop-&lt;git-sha&gt;</code>, <code>develop-latest</code></td></tr>
@@ -1029,9 +1146,9 @@
       <p>All resources are tagged with <code>environment: production</code> or <code>environment: uat</code>.</p>
     </section>
 
-    <!-- ── 14. Gaps ── -->
+    <!-- ── 15. Gaps ── -->
     <section class="section" id="gaps">
-      <div class="section-title"><span class="icon">⚠️</span> 14. Gaps &amp; Items Requiring Attention</div>
+      <div class="section-title"><span class="icon">⚠️</span> 15. Gaps &amp; Items Requiring Attention</div>
 
       <h4>Security</h4>
       <div class="gap-list">
@@ -1040,16 +1157,16 @@
           <code>fdv2-migrate-diag</code> and <code>fdv2-seed-diag</code> have plaintext database credentials and admin seed passwords embedded in their container environment config. These jobs should be deleted or converted to use Key Vault references (as <code>fdv2-migrate-prod</code> does).
         </div>
         <div class="gap-item security">
-          <div class="gap-label security">Storage account TLS version</div>
-          <code>fdv2prodsa</code> has minimum TLS set to 1.0. Should be raised to 1.2 to align with the Event Hub namespace.
-        </div>
-        <div class="gap-item security">
           <div class="gap-label security">No private endpoint on ACR</div>
           <code>fdv2acr</code> uses public network access. Container Apps pull images over the public internet.
         </div>
         <div class="gap-item security">
           <div class="gap-label security">GitHub Actions OIDC lacks scoped role assignment</div>
           The OIDC service principal has no explicit Contributor role on the resource groups — deployments rely on the subscription Owner role inherited from the human admin account. A dedicated least-privilege role should be assigned.
+        </div>
+        <div class="gap-item security">
+          <div class="gap-label security">DMARC not yet verified</div>
+          <code>_dmarc.delayedpaid.co.uk</code> TXT record is in place but ACS verification is still pending. No functional impact on email delivery but completes the SPF/DKIM/DMARC trifecta.
         </div>
       </div>
 
@@ -1068,16 +1185,12 @@
           Neither environment has geo-redundant backup enabled. A regional Azure outage would require restoring from the most recent local backup.
         </div>
         <div class="gap-item infra">
-          <div class="gap-label infra">Azure Communication Services not integrated</div>
-          <code>fdv2-comms</code> and <code>fdv2-email</code> exist but the application still uses SMTP.
-        </div>
-        <div class="gap-item infra">
           <div class="gap-label infra">ACR retention policy disabled</div>
           Images are not automatically purged. Tag count will grow indefinitely.
         </div>
         <div class="gap-item infra">
           <div class="gap-label infra">No automated migration step in CI/CD</div>
-          DB migrations must be triggered manually after each deployment.
+          DB migrations must be triggered manually after each deployment. If a migration fails at startup the container will crash-loop rather than surface a clear pipeline error.
         </div>
         <div class="gap-item infra">
           <div class="gap-label infra">Two orphaned Log Analytics workspaces in UAT</div>
