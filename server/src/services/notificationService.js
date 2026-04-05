@@ -3,11 +3,13 @@
 /**
  * Customer notification service — tenant-branded transactional emails.
  *
- * POC: Nodemailer → Mailtrap/Brevo sandbox (emails caught, not delivered).
- * Production: swap createTransport() for SendGrid / AWS SES / your SMTP relay.
+ * Transport selection (in priority order):
+ *   1. Azure Communication Services — when ACS_CONNECTION_STRING is set (UAT + Production)
+ *   2. SMTP via Nodemailer            — local development / fallback
  */
 
 const nodemailer = require('nodemailer');
+const { EmailClient } = require('@azure/communication-email');
 const { query }  = require('../db/connection');
 const config     = require('../config');
 
@@ -19,20 +21,21 @@ function tenantPortalUrl(tenant) {
 }
 
 const PLATFORM_NAME = 'Flight Delay Protection';
-const FROM_ADDRESS  = '"Flight Delay Protection" <delayed.paid@frostie.uk>';
 
-// ── Transport ─────────────────────────────────────────────────────────────────
-// PRODUCTION: replace this function body with your production mail transport
-function createTransport() {
-  return nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    auth: {
-      user: config.smtp.user,
-      pass: config.smtp.pass,
-    },
-    tls: { rejectUnauthorized: false },
-  });
+// ── Transport helpers ─────────────────────────────────────────────────────────
+
+function useAcs() {
+  return Boolean(config.acs.connectionString);
+}
+
+function acsFromAddress() {
+  // ACS requires a sender address from the provisioned domain.
+  // Falls back to the default Azure-managed domain sender if not explicitly set.
+  return config.acs.senderAddress || 'DoNotReply@0085c80a-43b3-4c65-a155-083341647f6b.azurecomm.net';
+}
+
+function smtpFromAddress() {
+  return '"Flight Delay Protection" <delayed.paid@frostie.uk>';
 }
 
 // ── HTML builder (tenant-branded) ─────────────────────────────────────────────
@@ -437,13 +440,16 @@ async function _send(ctx, subject, html, text, flightRegId, flightEventId, payme
     ]
   );
   const notifId = notifResult.rows[0].id;
+  const to = config.devEmailOverride || ctx.email;
 
   try {
-    const transport = createTransport();
-    const to = config.devEmailOverride || ctx.email;
-    await transport.sendMail({ from: FROM_ADDRESS, to, subject, html, text });
+    if (useAcs()) {
+      await _sendViaAcs(to, subject, html, text);
+    } else {
+      await _sendViaSmtp(to, subject, html, text);
+    }
     await query(`UPDATE notifications SET status = 'sent', sent_at = NOW() WHERE id = $1`, [notifId]);
-    console.log(`[notifications] Email sent to ${ctx.email}`);
+    console.log(`[notifications] Email sent to ${ctx.email} via ${useAcs() ? 'ACS' : 'SMTP'}`);
   } catch (err) {
     await query(
       `UPDATE notifications SET status = 'failed', error_message = $1 WHERE id = $2`,
@@ -451,6 +457,28 @@ async function _send(ctx, subject, html, text, flightRegId, flightEventId, payme
     );
     console.error(`[notifications] Failed to send to ${ctx.email}:`, err.message);
   }
+}
+
+async function _sendViaAcs(to, subject, html, text) {
+  const client = new EmailClient(config.acs.connectionString);
+  const message = {
+    senderAddress: acsFromAddress(),
+    content: { subject, html, plainText: text },
+    recipients: { to: [{ address: to }] },
+  };
+  // beginSend returns a poller; we wait for the send to be accepted (not delivered)
+  const poller = await client.beginSend(message);
+  await poller.pollUntilDone();
+}
+
+async function _sendViaSmtp(to, subject, html, text) {
+  const transport = nodemailer.createTransport({
+    host: config.smtp.host,
+    port: config.smtp.port,
+    auth: { user: config.smtp.user, pass: config.smtp.pass },
+    tls: { rejectUnauthorized: false },
+  });
+  await transport.sendMail({ from: smtpFromAddress(), to, subject, html, text });
 }
 
 module.exports = {

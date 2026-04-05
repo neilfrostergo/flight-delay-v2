@@ -66,6 +66,13 @@ const config = {
     pass: optionalEnv('SMTP_PASS', ''),
   },
 
+  // Azure Communication Services — when set, emails are sent via ACS instead of SMTP.
+  // Leave blank in local development to keep using SMTP/Mailtrap.
+  acs: {
+    connectionString: optionalEnv('ACS_CONNECTION_STRING', ''),
+    senderAddress:    optionalEnv('ACS_SENDER_ADDRESS', ''),
+  },
+
   // Azure Event Hub — production only (ignored in development)
   eventHub: {
     connectionString:        optionalEnv('EVENT_HUB_CONNECTION_STRING', ''),
