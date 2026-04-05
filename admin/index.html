@@ -318,6 +318,9 @@
         <div class="nav-item" data-page="tokens" onclick="nav('tokens')">
           <span class="icon">🎫</span> Pre-val Tokens
         </div>
+        <div class="nav-item" data-page="documents" onclick="nav('documents')">
+          <span class="icon">📄</span> Documents <span id="doc-review-badge" class="badge badge-red" style="display:none;margin-left:4px"></span>
+        </div>
         <div class="nav-section">Tools</div>
         <div class="nav-item" data-page="simulator" onclick="nav('simulator')">
           <span class="icon">🧪</span> Simulator
@@ -557,6 +560,37 @@
           </table>
         </div>
         <div class="pagination" id="tok-pagination"></div>
+      </div>
+
+      <!-- ── Documents ─────────────────────────────── -->
+      <div class="page" id="page-documents">
+        <div class="page-header">
+          <h2>Document Review Queue</h2>
+        </div>
+        <div style="margin-bottom:12px;font-size:13px;color:var(--muted)">
+          Documents flagged for manual review — AI could not confirm authenticity, or the document did not match the registered flight.
+          Approving a document will release any held payment.
+        </div>
+        <div class="filters">
+          <div class="form-group"><label>Status</label>
+            <select id="doc-status" onchange="loadDocuments(1)">
+              <option value="">All pending review</option>
+              <option value="pending_ai">AI unavailable</option>
+              <option value="partial_match">Partial match</option>
+              <option value="no_match">No flight match</option>
+              <option value="unreadable">Unreadable</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Uploaded</th><th>Tenant</th><th>Policy</th><th>Customer</th><th>Flight</th><th>File</th><th>Status</th><th>AI Result</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="doc-body"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="doc-pagination"></div>
       </div>
 
       <!-- ── Simulator ──────────────────────────────── -->
@@ -1154,6 +1188,13 @@ async function initApp() {
 
   nav('dashboard');
 
+  // Load document review badge count in background
+  GET('/api/admin/documents?limit=1').then(res => {
+    if (!res?.ok) return;
+    const badge = document.getElementById('doc-review-badge');
+    if (res.data.total > 0) { badge.textContent = res.data.total; badge.style.display = ''; }
+  }).catch(() => {});
+
   // Show UAT banner if running in UAT environment
   try {
     const cfgRes = await fetch('/api/tenant-config');
@@ -1194,6 +1235,7 @@ function nav(page) {
     flights:      () => loadFlights(1),
     payments:     () => loadPayments(1),
     tokens:       () => { loadTokenFunnel(); loadTokens(1); },
+    documents:    () => loadDocuments(1),
     simulator:    loadSimulator,
     settings:     loadSettings,
     users:        loadUsers,
@@ -1975,6 +2017,76 @@ async function revokeToken(id) {
   if (!confirm('Revoke this token?')) return;
   await DELETE(`/api/admin/tokens/${id}`);
   loadTokens(tokPage);
+}
+
+// ── Documents review queue ──────────────────────────────────────────────────
+let docPage = 1;
+
+const DOC_STATUS_LABELS = {
+  pending_ai:    { label: 'AI unavailable', cls: 'badge-yellow' },
+  partial_match: { label: 'Partial match',  cls: 'badge-yellow' },
+  no_match:      { label: 'No match',       cls: 'badge-red'    },
+  unreadable:    { label: 'Unreadable',     cls: 'badge-gray'   },
+};
+
+async function loadDocuments(page = 1) {
+  docPage = page;
+  const params = new URLSearchParams({ page, limit: 50 });
+  const status = document.getElementById('doc-status').value;
+  if (status) params.set('status', status);
+
+  const res   = await GET(`/api/admin/documents?${params}`);
+  const tbody = document.getElementById('doc-body');
+  if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="9" class="empty">Failed to load</td></tr>'; return; }
+
+  const { total, documents } = res.data;
+
+  // Update nav badge with total count
+  const badge = document.getElementById('doc-review-badge');
+  if (total > 0) { badge.textContent = total; badge.style.display = ''; }
+  else badge.style.display = 'none';
+
+  if (!documents.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No documents awaiting review</td></tr>';
+    renderPagination('doc-pagination', 0, 50, page, loadDocuments);
+    return;
+  }
+
+  tbody.innerHTML = documents.map(d => {
+    const st   = DOC_STATUS_LABELS[d.match_status] || { label: d.match_status, cls: 'badge-gray' };
+    const aiCell = d.ai_genuine !== null && d.ai_genuine !== undefined
+      ? `<span class="badge ${d.ai_genuine ? 'badge-green' : 'badge-red'}" title="${esc(d.ai_reason || '')}">${d.ai_genuine ? 'Genuine' : 'Suspect'} (${d.ai_confidence || '?'})</span>`
+      : '<span class="text-muted">–</span>';
+    const flightCell = d.flight_number
+      ? `${d.flight_number} ${d.dep_date ? String(d.dep_date).slice(0, 10) : ''}`
+      : '<span class="text-muted">–</span>';
+    const awaitingPayment = d.flight_status === 'awaiting_document' && d.pending_flight_event_id;
+
+    return `<tr>
+      <td class="text-muted"><small>${fmtDateTime(d.uploaded_at)}</small></td>
+      <td><small>${esc(d.tenant_name)}</small></td>
+      <td class="mono"><small>${esc(d.policy_number)}</small></td>
+      <td><small>${esc(d.first_name || '')} ${esc(d.last_name || '')}<br><span class="text-muted">${esc(d.email)}</span></small></td>
+      <td class="mono"><small>${flightCell}</small></td>
+      <td><small>${esc(d.original_name)}<br><span class="text-muted">${d.file_size_bytes ? (d.file_size_bytes / 1024).toFixed(0) + ' KB' : ''}</span></small></td>
+      <td><span class="badge ${st.cls}">${st.label}</span>${awaitingPayment ? '<br><small class="text-muted">payment held</small>' : ''}</td>
+      <td style="max-width:220px"><small>${aiCell}${d.ai_reason ? `<br><span class="text-muted">${esc(d.ai_reason)}</span>` : ''}</small></td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="reviewDocument(${d.id},'approve')">Approve</button>
+        <button class="btn btn-danger btn-sm"  onclick="reviewDocument(${d.id},'reject')">Reject</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('doc-pagination', total, 50, page, loadDocuments);
+}
+
+async function reviewDocument(id, action) {
+  const label = action === 'approve' ? 'approve this document (this may trigger a payment)' : 'reject this document';
+  if (!confirm(`Are you sure you want to ${label}?`)) return;
+  const res = await PATCH(`/api/admin/documents/${id}`, { action });
+  if (res?.ok) loadDocuments(docPage);
+  else alert(res?.data?.error || 'Action failed');
 }
 
 async function importTokenCsv(input) {

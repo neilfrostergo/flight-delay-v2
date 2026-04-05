@@ -40,6 +40,7 @@ const adminRequestLogRouter = require('./routes/admin/requestLog');
 const adminUsersRouter = require('./routes/admin/adminUsers');
 const adminTenantSettingsRouter = require('./routes/admin/tenantSettings');
 const adminCoverholdersRouter = require('./routes/admin/coverholders');
+const adminDocumentsRouter    = require('./routes/admin/documents');
 
 // Background services
 const eventSource = require('./services/eventSource');
@@ -129,6 +130,7 @@ app.use('/api/admin/tenant-settings', requireAdmin.requireAdmin, adminTenantSett
 app.use('/api/admin/simulator', requireAdmin.requireAdmin, adminSimulateRouter);
 app.use('/api/admin/request-log', requireAdmin.requireSuperAdmin, adminRequestLogRouter);
 app.use('/api/admin/coverholders', requireAdmin.requireSuperAdmin, adminCoverholdersRouter);
+app.use('/api/admin/documents',   requireAdmin.requireAdmin, adminDocumentsRouter);
 
 // ── Static files ──────────────────────────────────────────────────────────────
 const CUSTOMER_DIR = path.join(__dirname, '..', '..', 'customer');
