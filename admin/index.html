@@ -2042,10 +2042,10 @@ let docSelectedId = null;
 let docPreviewObjectUrl = null;
 
 const DOC_STATUS_LABELS = {
-  pending_ai:    { label: 'AI unavailable', cls: 'badge-yellow' },
-  partial_match: { label: 'Partial match',  cls: 'badge-yellow' },
-  no_match:      { label: 'No match',       cls: 'badge-red'    },
-  unreadable:    { label: 'Unreadable',     cls: 'badge-gray'   },
+  pending_ai:    { label: 'Needs review',  cls: 'badge-yellow' },
+  partial_match: { label: 'Partial match', cls: 'badge-yellow' },
+  no_match:      { label: 'No match',      cls: 'badge-red'    },
+  unreadable:    { label: 'Unreadable',    cls: 'badge-gray'   },
 };
 
 async function loadDocuments(page = 1) {
