@@ -76,7 +76,7 @@ async function parseDocument(filePath, mimeType) {
     const buf  = fs.readFileSync(filePath);
     const data = await pdfParse(new Uint8Array(buf));
     const info = extractInfo(data.text || '');
-    return { parseMethod: 'pdf', ...info };
+    return { parseMethod: 'pdf', rawText: data.text || '', ...info };
   } catch (err) {
     console.warn('[documentParser] PDF parse error:', err.message);
     return { parseMethod: 'pdf_error', flightNumbers: [], dates: [] };

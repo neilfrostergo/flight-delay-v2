@@ -14,6 +14,7 @@ const { parseDocument, matchFlights }      = require('../services/documentParser
 const { getOrCreateSubscription }          = require('../services/oagAlerts');
 const { validatePolicy }                   = require('../services/policyValidator');
 const { triggerDeferredPayment }           = require('../services/delayProcessor');
+const { verifyDocument }                   = require('../services/documentVerifier');
 
 const router = express.Router();
 
@@ -375,6 +376,19 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
       matchStatus = 'no_match';
     }
 
+    // AI authenticity verification — runs when text was extracted successfully
+    let aiResult = { genuine: null, confidence: null, passengerName: null, reason: null };
+    if (parsed.parseMethod === 'pdf' && parsed.rawText) {
+      const targetFlight = allFlights.rows.find(f => f.id === flightId);
+      aiResult = await verifyDocument(parsed.rawText, targetFlight);
+
+      // If AI is available and says not genuine — downgrade match to rejected
+      if (aiResult.genuine === false && aiResult.confidence === 'high') {
+        matchStatus = 'rejected';
+        console.warn(`[customerPortal] AI rejected document for reg ${registrationId} flight ${flightId}: ${aiResult.reason}`);
+      }
+    }
+
     await query(
       `UPDATE registration_documents
        SET parse_method           = $1,
@@ -382,8 +396,12 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
            parsed_dates           = $3,
            matched_flight_id      = $4,
            match_confidence       = $5,
-           match_status           = $6
-       WHERE id = $7`,
+           match_status           = $6,
+           ai_genuine             = $7,
+           ai_confidence          = $8,
+           ai_passenger_name      = $9,
+           ai_reason              = $10
+       WHERE id = $11`,
       [
         parsed.parseMethod,
         parsed.flightNumbers,
@@ -391,6 +409,10 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
         matchedFlightId || null,
         matchConfidence || null,
         matchStatus,
+        aiResult.genuine,
+        aiResult.confidence,
+        aiResult.passengerName,
+        aiResult.reason,
         doc.id,
       ]
     );
@@ -400,6 +422,8 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
     doc.parsed_flight_numbers = parsed.flightNumbers;
     doc.parsed_dates          = parsed.dates;
     doc.parse_method          = parsed.parseMethod;
+    doc.ai_genuine            = aiResult.genuine;
+    doc.ai_passenger_name     = aiResult.passengerName;
 
     // If we found a match for a different flight than the one uploaded against,
     // note it but keep the explicit flight association.
