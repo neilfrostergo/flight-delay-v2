@@ -186,14 +186,16 @@ router.get('/:id/content', async (req, res) => {
     const png = await renderFirstPage(fileBuffer);
     if (png) {
       res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Content-Disposition', 'inline; filename=" "');
+      res.setHeader('Cache-Control', 'no-store');
       return res.send(png);
     }
     // pdftoppm not installed — fall through and serve raw PDF
   }
 
   res.setHeader('Content-Type', mime_type || 'application/octet-stream');
-  res.setHeader('Content-Disposition', 'inline');
+  res.setHeader('Content-Disposition', 'inline; filename=" "');
+  res.setHeader('Cache-Control', 'no-store');
   return res.send(fileBuffer);
 });
 

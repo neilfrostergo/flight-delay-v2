@@ -184,7 +184,10 @@
     .doc-preview-pane.empty { align-items: center; justify-content: center; min-height: 300px; color: var(--muted); font-size: 14px; }
     .doc-preview-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--card-bg); flex-shrink: 0; }
     .doc-preview-header .doc-name { flex: 1; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-preview-body { overflow-y: auto; max-height: 70vh; background: #f0f0f0; }
+    .doc-preview-body canvas { display: block; max-width: 100%; height: auto; margin: 0 auto; }
     .doc-preview-frame { width: 100%; flex: 1; min-height: 500px; border: none; display: block; background: #fff; }
+    .doc-preview-pane { -webkit-touch-callout: none; user-select: none; }
     .doc-row-selected { background: color-mix(in srgb, var(--brand) 8%, transparent) !important; }
     .doc-row-selected td { background: transparent !important; }
 
@@ -2112,6 +2115,7 @@ async function previewDocument(id, name, mime, awaitingPayment) {
 
   const pane = document.getElementById('doc-preview-pane');
   pane.className = 'doc-preview-pane';
+  pane.oncontextmenu = e => e.preventDefault();
   pane.innerHTML = `
     <div class="doc-preview-header">
       <span class="doc-name" title="${esc(name)}">${esc(name)}</span>
@@ -2119,7 +2123,7 @@ async function previewDocument(id, name, mime, awaitingPayment) {
       <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="reviewDocument(${id},'approve')">Approve</button>
       <button class="btn btn-danger btn-sm"  style="flex-shrink:0" onclick="reviewDocument(${id},'reject')">Reject</button>
     </div>
-    <div id="doc-preview-body" style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:#f8f8f8">
+    <div id="doc-preview-body" class="doc-preview-body" style="display:flex;align-items:center;justify-content:center;min-height:200px;padding:12px">
       <div class="spinner"></div>
     </div>`;
 
@@ -2133,17 +2137,38 @@ async function previewDocument(id, name, mime, awaitingPayment) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const blobData = await response.blob();
-    docPreviewObjectUrl = URL.createObjectURL(blobData);
-
     const body = document.getElementById('doc-preview-body');
     if (!body) return; // user navigated away
-    body.style.padding = '0';
 
-    // Server renders PDFs to PNG, so always use <img> — check actual response type
     if (blobData.type.startsWith('image/')) {
-      body.innerHTML = `<img src="${docPreviewObjectUrl}" style="max-width:100%;max-height:70vh;display:block;margin:auto;object-fit:contain;padding:12px" />`;
+      // Draw onto canvas and immediately revoke the object URL so there is no
+      // linkable URL the admin can right-click-save or open in a new tab.
+      const objectUrl = URL.createObjectURL(blobData);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const canvas = document.createElement('canvas');
+        const maxW = body.clientWidth || 600;
+        const scale = Math.min(1, maxW / img.naturalWidth);
+        canvas.width  = Math.round(img.naturalWidth  * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        body.style.padding = '0';
+        body.style.display = 'block';
+        body.innerHTML = '';
+        body.appendChild(canvas);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        body.innerHTML = `<span style="color:var(--muted)">Could not render image</span>`;
+      };
+      img.src = objectUrl;
     } else {
-      body.innerHTML = `<iframe src="${docPreviewObjectUrl}" class="doc-preview-frame" title="${esc(name)}"></iframe>`;
+      // PDF fallback (pdftoppm not installed in local dev): iframe with no download UI
+      docPreviewObjectUrl = URL.createObjectURL(blobData);
+      body.style.padding = '0';
+      body.style.display = 'block';
+      body.innerHTML = `<iframe src="${docPreviewObjectUrl}#toolbar=0&navpanes=0" class="doc-preview-frame" title="${esc(name)}"></iframe>`;
     }
   } catch (err) {
     const body = document.getElementById('doc-preview-body');
