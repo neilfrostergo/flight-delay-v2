@@ -479,9 +479,43 @@ async function _sendViaSmtp(to, subject, html, text) {
   await transport.sendMail({ from: smtpFromAddress(), to, subject, html, text });
 }
 
+// ── Document upload request ───────────────────────────────────────────────────
+async function sendDocumentUploadRequest(registration, flightReg, uploadUrl, tenant) {
+  const brandColor  = tenant?.primary_colour || '#1a56db';
+  const companyName = tenant?.name || PLATFORM_NAME;
+
+  const subject = `Action required — upload your document to receive your payout`;
+
+  const html = buildEmailHtml({
+    heading:    'Your payout is ready — we just need one document',
+    subheading: `Flight ${flightReg.flight_number} — ${flightReg.dep_iata || ''} → ${flightReg.arr_iata || ''}`,
+    bodyLines: [
+      `Hi ${registration.first_name},`,
+      `Your flight <strong>${flightReg.flight_number}</strong> on <strong>${String(flightReg.dep_date).slice(0, 10)}</strong> has triggered a payout under your policy.`,
+      `To release your payment we need to verify a copy of your <strong>booking confirmation</strong> or <strong>e-ticket</strong> for this flight. Please click the button below to upload it — it only takes a moment.`,
+      `<table width="100%" cellpadding="0" cellspacing="0">${ctaButton(uploadUrl, 'Upload My Document →', brandColor)}</table>`,
+      `<small style="color:#6b7280;">This link is personal to you and expires in 30 days. Do not share it.</small>`,
+    ],
+    policyNumber: registration.policy_number,
+    tenant,
+    badgeLabel: 'Document Required',
+    badgeColor: '#f59e0b',
+  });
+
+  const text = `Hi ${registration.first_name},\n\nYour flight ${flightReg.flight_number} on ${String(flightReg.dep_date).slice(0, 10)} has triggered a payout, but we need to verify your booking confirmation or e-ticket before we can release the payment.\n\nPlease upload your document here:\n${uploadUrl}\n\nThis link expires in 30 days.\n\nPolicy: ${registration.policy_number}\n\n— ${companyName}`;
+
+  await _send(
+    { registrationId: registration.id, email: registration.email },
+    subject, html, text,
+    flightReg.id, null, null,
+    tenant
+  );
+}
+
 module.exports = {
   sendRegistrationConfirmation,
   sendPayoutNotification,
+  sendDocumentUploadRequest,
   sendSingleTripOutreach,
   sendReturnTripOutreach,
   sendAnnualMultiTripOutreach,

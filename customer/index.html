@@ -1415,7 +1415,7 @@
       <!-- Document scan shortcut -->
       <div class="scan-shortcut">
         <label class="scan-shortcut-label" for="step2-scan-input">
-          📄 Upload boarding pass or itinerary to find your flight automatically
+          📄 Upload booking confirmation or itinerary to find your flight automatically
         </label>
         <input type="file" id="step2-scan-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                onchange="step2ScanDocument(this)">
@@ -1564,7 +1564,7 @@
         <div class="upload-header">
           <div>
             <div class="upload-title">Upload your booking confirmation</div>
-            <div class="upload-sub">Uploading your booking confirmation or boarding pass lets us pay your benefit automatically if your flight is delayed — no further evidence needed.</div>
+            <div class="upload-sub">Uploading your booking confirmation or e-ticket lets us pay your benefit automatically if your flight is delayed — no further evidence needed.</div>
           </div>
         </div>
 
@@ -1653,7 +1653,7 @@
             <!-- Scan option -->
             <div class="scan-shortcut" style="margin-bottom:14px">
               <label class="scan-shortcut-label" for="portal-scan-input">
-                📄 Upload boarding pass or itinerary to find your flight
+                📄 Upload booking confirmation or itinerary to find your flight
               </label>
               <input type="file" id="portal-scan-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                      onchange="portalScanDocument(this)">
@@ -1748,8 +1748,9 @@ const state = {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function init() {
-  const urlParams = new URLSearchParams(location.search);
-  const token = urlParams.get('token');
+  const urlParams    = new URLSearchParams(location.search);
+  const token        = urlParams.get('token');
+  const uploadToken  = urlParams.get('upload_token');
 
   try {
     const res = await fetch('/api/tenant-config', { headers: tenantHeader() });
@@ -1781,7 +1782,9 @@ const state = {
     document.getElementById('portal-toggle-btn').style.display = '';
   }
 
-  if (token && /^[0-9a-f]{64}$/i.test(token)) {
+  if (uploadToken && /^[0-9a-f]{64}$/i.test(uploadToken)) {
+    await consumeUploadToken(uploadToken);
+  } else if (token && /^[0-9a-f]{64}$/i.test(token)) {
     await consumeToken(token);
   } else {
     showStep(1);
@@ -2140,6 +2143,28 @@ async function consumeToken(token) {
     showStep(1);
   } finally {
     btn.disabled = false; btn.textContent = 'Continue →';
+  }
+}
+
+async function consumeUploadToken(uploadToken) {
+  try {
+    const res = await fetch(`/api/customer/upload-token/${encodeURIComponent(uploadToken)}`, {
+      headers: tenantHeader(),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      // Invalid/expired link — fall back to portal login
+      showPortal();
+      return;
+    }
+    // Auto-login and open portal, flagging which flight needs a document
+    portalSaveSession(data.token, data.registrationId);
+    portalState.uploadFlightId = data.flightRegistrationId || null;
+    // Clean the URL so a refresh doesn't re-consume the token
+    history.replaceState(null, '', location.pathname);
+    showPortal();
+  } catch (_) {
+    showPortal();
   }
 }
 
@@ -2684,7 +2709,7 @@ function hexWithAlpha(hex, alpha) {
 
 // ── Customer Portal ────────────────────────────────────────────────────────────
 
-const portalState = { token: null, registrationId: null, loggedOut: false };
+const portalState = { token: null, registrationId: null, loggedOut: false, uploadFlightId: null };
 
 function portalStorageKey() {
   return `cp_${state.tenant?.slug || 'default'}`;
@@ -2864,6 +2889,20 @@ async function showPortalDash() {
     // Session confirmed by server — safe to show the logout pill
     document.getElementById('portal-logout-pill').style.display = '';
     renderPortalDash(data);
+    // If we arrived via an upload token, scroll to and highlight that flight
+    if (portalState.uploadFlightId) {
+      const flightId = portalState.uploadFlightId;
+      portalState.uploadFlightId = null;
+      setTimeout(() => {
+        const el = document.getElementById(`portal-flight-${flightId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.style.outline = '2px solid var(--primary)';
+          el.style.outlineOffset = '4px';
+          setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 3000);
+        }
+      }, 300);
+    }
   } catch (err) {
     console.error('[portal] showPortalDash error:', err);
     document.getElementById('portal-flights-list').innerHTML =
@@ -3217,7 +3256,7 @@ function renderPortalFlightCard(flight, reg) {
        </div>`
     : `<div class="portal-upload-area">
          <label class="portal-upload-btn" for="portal-file-${flight.id}">
-           + Upload booking confirmation or boarding pass
+           + Upload booking confirmation or e-ticket
          </label>
          <input type="file" id="portal-file-${flight.id}"
                 accept=".pdf,.jpg,.jpeg,.png" style="display:none"
@@ -3227,7 +3266,7 @@ function renderPortalFlightCard(flight, reg) {
        </div>`;
 
   return `
-    <div class="portal-flight-card">
+    <div class="portal-flight-card" id="portal-flight-${flight.id}">
       <div class="portal-flight-header">
         <div class="portal-flight-num">${escHtml(flight.flight_number)}</div>
         ${route ? `<div class="portal-flight-route">${escHtml(route)}</div>` : ''}

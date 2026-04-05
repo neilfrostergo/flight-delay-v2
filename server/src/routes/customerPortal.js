@@ -10,9 +10,10 @@ const { v4: uuidv4 } = require('uuid');
 const config          = require('../config');
 const { query }       = require('../db/connection');
 const requireCustomer = require('../middleware/requireCustomer');
-const { parseDocument, matchFlights } = require('../services/documentParser');
-const { getOrCreateSubscription }     = require('../services/oagAlerts');
-const { validatePolicy }              = require('../services/policyValidator');
+const { parseDocument, matchFlights }      = require('../services/documentParser');
+const { getOrCreateSubscription }          = require('../services/oagAlerts');
+const { validatePolicy }                   = require('../services/policyValidator');
+const { triggerDeferredPayment }           = require('../services/delayProcessor');
 
 const router = express.Router();
 
@@ -170,6 +171,54 @@ router.post('/sessions', async (req, res) => {
   );
 
   return res.json({ token, registrationId });
+});
+
+// ── GET /api/customer/upload-token/:token — validate upload link, return session ─
+// Public — no requireCustomer. The token itself is the proof of identity.
+router.get('/upload-token/:token', async (req, res) => {
+  if (!req.tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+  const { token } = req.params;
+  if (!token || !/^[0-9a-f]{64}$/.test(token)) {
+    return res.status(400).json({ error: 'Invalid token format' });
+  }
+
+  const result = await query(
+    `SELECT t.flight_registration_id,
+            r.id AS reg_id, r.policy_type, r.travelers, r.cover_summary
+     FROM document_upload_tokens t
+     JOIN registrations r ON r.id = t.registration_id
+     WHERE t.token = $1
+       AND t.tenant_id = $2
+       AND t.used_at IS NULL
+       AND t.expires_at > NOW()`,
+    [token, req.tenant.id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'This link is invalid or has expired' });
+  }
+
+  const row = result.rows[0];
+
+  const jwtToken = jwt.sign(
+    {
+      sub:           row.reg_id,
+      tenant_id:     req.tenant.id,
+      type:          'customer',
+      policy_type:   row.policy_type,
+      travelers:     row.travelers,
+      cover_summary: row.cover_summary,
+    },
+    config.jwt.secret,
+    { expiresIn: '24h' }
+  );
+
+  return res.json({
+    token:                jwtToken,
+    registrationId:       row.reg_id,
+    flightRegistrationId: row.flight_registration_id,
+  });
 });
 
 // ── GET /api/customer/registration — full detail with flights + documents ─────
@@ -358,6 +407,21 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
       const matchedFlight = allFlights.rows.find(f => f.id === matchResult.flightId);
       if (matchedFlight) {
         doc.match_note = `Document matched flight ${matchedFlight.flight_number} on ${String(matchedFlight.dep_date).slice(0, 10)}`;
+      }
+    }
+
+    // If document is validated, check for a deferred payment waiting on this flight
+    if (matchStatus === 'matched') {
+      const deferredResult = await query(
+        `SELECT pending_flight_event_id
+         FROM flight_registrations
+         WHERE id = $1 AND status = 'awaiting_document' AND pending_flight_event_id IS NOT NULL`,
+        [flightId]
+      );
+      if (deferredResult.rows.length > 0) {
+        const { pending_flight_event_id } = deferredResult.rows[0];
+        triggerDeferredPayment(flightId, pending_flight_event_id)
+          .catch((err) => console.error('[customerPortal] Deferred payment error:', err.message));
       }
     }
   } catch (analysisErr) {
