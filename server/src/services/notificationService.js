@@ -566,7 +566,7 @@ async function sendAdminEmail({ toAddress, subject, html }) {
 async function sendAdminInvite({ username, email, setPasswordUrl }) {
   await sendAdminEmail({
     toAddress: email,
-    subject:   'You\'ve been invited to Flight Delay Admin — set your password',
+    subject:   'Action required: activate your Flight Delay Admin account',
     html: adminEmailHtml({
       heading:    'Set up your admin account',
       bodyLines:  [
@@ -583,7 +583,7 @@ async function sendAdminInvite({ username, email, setPasswordUrl }) {
 async function sendAdminPasswordReset({ username, email, setPasswordUrl }) {
   await sendAdminEmail({
     toAddress: email,
-    subject:   'Reset your Flight Delay Admin password',
+    subject:   'Flight Delay Admin: password reset request',
     html: adminEmailHtml({
       heading:    'Password reset requested',
       bodyLines:  [
