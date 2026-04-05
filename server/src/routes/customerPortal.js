@@ -609,6 +609,7 @@ router.delete('/flights/:flightId', requireCustomer, async (req, res) => {
     }
   }
 
+  await query(`DELETE FROM notifications WHERE flight_registration_id = $1`, [flightId]);
   await query(`DELETE FROM flight_registrations WHERE id = $1`, [flightId]);
 
   return res.json({ ok: true });
