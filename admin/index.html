@@ -1186,13 +1186,43 @@ document.getElementById('login-password').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 
-function logout() {
+function logout(reason) {
   state.token = null;
   state.me = null;
   localStorage.removeItem('admin_token');
+  idleTimer.stop();
   document.getElementById('app').classList.remove('visible');
   document.getElementById('auth-screen').style.display = '';
+  if (reason === 'idle') {
+    document.getElementById('auth-error').textContent = 'You were signed out after 15 minutes of inactivity.';
+    document.getElementById('auth-error').style.display = '';
+  }
 }
+
+// ── Idle timeout (15 minutes) ─────────────────────────────────────────────────
+const idleTimer = (() => {
+  const TIMEOUT_MS = 15 * 60 * 1000;
+  let timer = null;
+
+  function reset() {
+    if (!state.token) return; // not logged in — do nothing
+    clearTimeout(timer);
+    timer = setTimeout(() => logout('idle'), TIMEOUT_MS);
+  }
+
+  function start() {
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach(e => document.addEventListener(e, reset, { passive: true }));
+    reset();
+  }
+
+  function stop() {
+    clearTimeout(timer);
+    timer = null;
+  }
+
+  return { start, stop, reset };
+})();
 
 async function initApp() {
   const res = await GET('/api/admin/auth/me');
@@ -1201,6 +1231,7 @@ async function initApp() {
 
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
+  idleTimer.start();
 
   document.getElementById('topbar-user').textContent = state.me.username;
   document.getElementById('topbar-role').textContent = state.me.role;
