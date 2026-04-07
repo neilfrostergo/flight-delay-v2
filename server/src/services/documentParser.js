@@ -14,10 +14,11 @@ const MONTHS = {
 function extractInfo(text) {
   const upper = text.toUpperCase();
 
-  // Flight numbers: 2–3 letter IATA carrier code followed immediately by 1–4 digits.
-  // Optionally separated by a single space or dash.
+  // Flight numbers: 2–3 letter IATA carrier code followed by 1–4 digits.
+  // Allow up to 3 whitespace/dash chars between code and number to handle
+  // PDFs where extraction introduces extra spaces or a newline (e.g. "VA  015").
   const flightNums = new Set();
-  const reF = /\b([A-Z]{2,3})[\s\-]?(\d{1,4})\b/g;
+  const reF = /\b([A-Z]{2,3})[\s\-]{0,3}(\d{1,4})\b/g;
   let m;
   while ((m = reF.exec(upper)) !== null) {
     flightNums.add(`${m[1]}${m[2]}`);
@@ -78,6 +79,7 @@ async function parseDocument(filePath, mimeType) {
       const buf  = fs.readFileSync(filePath);
       const data = await pdfParse(new Uint8Array(buf));
       const info = extractInfo(data.text || '');
+      console.log('[documentParser] PDF extracted flights:', info.flightNumbers, 'dates:', info.dates);
       return { parseMethod: 'pdf', rawText: data.text || '', ...info };
     } catch (err) {
       console.warn('[documentParser] PDF parse error:', err.message);
