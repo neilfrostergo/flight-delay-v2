@@ -33,7 +33,7 @@ A genuine document will typically have: a booking reference, passenger name, air
 }
 
 async function getClient() {
-  const { AzureOpenAI }           = require('@azure/openai');
+  const { AzureOpenAI }               = require('openai');
   const { ManagedIdentityCredential } = require('@azure/identity');
   const credential = new ManagedIdentityCredential({ clientId: config.azureOpenAI.clientId });
   return new AzureOpenAI({
