@@ -146,20 +146,22 @@ function stubValidate(policyNumber, email) {
     return { valid: false, errorMessage: 'Invalid email address' };
   }
 
-  // Stub cover summary — realistic travel insurance benefits
-  const stubCoverSummary = [
-    { name: 'Travel Delay',          limit: 280,      excess: 0,   description: 'Payable after a qualifying 12-hour delay' },
-    { name: 'Cancellation',          limit: 3000,     excess: 100, description: 'Trip cancellation for covered reasons' },
-    { name: 'Emergency Medical',     limit: 10000000, excess: 100, description: 'Medical and repatriation expenses abroad' },
-    { name: 'Missed Departure',      limit: 1000,     excess: 0,   description: 'Additional travel costs due to missed departure' },
-    { name: 'Personal Possessions',  limit: 1500,     excess: 50,  description: 'Loss, theft or damage to belongings' },
-    { name: 'Personal Liability',    limit: 2000000,  excess: 0,   description: 'Legal liability to third parties' },
-  ];
+  function buildCoverSummary(travelDelayLimit) {
+    return [
+      { name: 'Travel Delay',          limit: travelDelayLimit, excess: 0,   description: 'Payable after a qualifying 12-hour delay' },
+      { name: 'Cancellation',          limit: 3000,             excess: 100, description: 'Trip cancellation for covered reasons' },
+      { name: 'Emergency Medical',     limit: 10000000,         excess: 100, description: 'Medical and repatriation expenses abroad' },
+      { name: 'Missed Departure',      limit: 1000,             excess: 0,   description: 'Additional travel costs due to missed departure' },
+      { name: 'Personal Possessions',  limit: 1500,             excess: 50,  description: 'Loss, theft or damage to belongings' },
+      { name: 'Personal Liability',    limit: 2000000,          excess: 0,   description: 'Legal liability to third parties' },
+    ];
+  }
 
   // Return rich data for known demo policies
   const demo = DEMO_POLICIES[policyNumber.toUpperCase()];
   if (demo) {
-    return { valid: true, rawResponse: { stub: true }, coverSummary: stubCoverSummary, ...demo };
+    const payoutGbp = Math.round(demo.payoutPence / 100);
+    return { valid: true, rawResponse: { stub: true }, coverSummary: buildCoverSummary(payoutGbp), ...demo };
   }
 
   // For unknown policies derive deterministic values and default to annual multi-trip
@@ -178,7 +180,7 @@ function stubValidate(policyNumber, email) {
     payoutPence: payoutGbp * 100,
     coverStartDate: new Date().toISOString().slice(0, 10),
     coverEndDate:   new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    coverSummary:   stubCoverSummary,
+    coverSummary:   buildCoverSummary(payoutGbp),
     rawResponse: { stub: true },
   };
 }
