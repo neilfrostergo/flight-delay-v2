@@ -403,6 +403,7 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
       const targetFlight = allFlights.rows.find(f => f.id === flightId);
       aiResult = await verifyDocument(parsed, targetFlight);
 
+      console.log(`[upload] AI result: genuine=${aiResult.genuine} flightNumber=${aiResult.flightNumber} flightDate=${aiResult.flightDate} passengerName=${aiResult.passengerName}`);
       // If AI extracted a specific flight number, use it as the canonical source —
       // it correctly distinguishes flight numbers from booking references.
       if (aiResult.flightNumber) {
