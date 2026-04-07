@@ -108,19 +108,19 @@ async function verifyDocument(parsed, registeredFlight) {
 
     const raw = response.choices[0]?.message?.content?.trim() || '';
 
-    let parsed;
+    let aiJson;
     try {
-      parsed = JSON.parse(raw);
+      aiJson = JSON.parse(raw);
     } catch {
       console.warn('[documentVerifier] Could not parse AI response:', raw);
       return { genuine: null, confidence: null, passengerName: null, reason: 'AI response parse error' };
     }
 
     return {
-      genuine:       Boolean(parsed.genuine),
-      confidence:    parsed.confidence || 'medium',
-      passengerName: parsed.passengerName || null,
-      reason:        parsed.reason       || '',
+      genuine:       Boolean(aiJson.genuine),
+      confidence:    aiJson.confidence || 'medium',
+      passengerName: aiJson.passengerName || null,
+      reason:        aiJson.reason       || '',
     };
 
   } catch (err) {
