@@ -32,7 +32,7 @@ router.post('/', upload.single('document'), async (req, res) => {
     if (flightNumbers.length > 1) {
       const codes = flightNumbers.map(f => f.replace(/\d+$/, '').replace(/\s/g, ''));
       const rows = await query(
-        `SELECT iata_code FROM carriers WHERE iata_code = ANY($1)`,
+        `SELECT iata_code FROM ref_carriers WHERE iata_code = ANY($1)`,
         [codes]
       );
       const validCodes = new Set(rows.rows.map(r => r.iata_code));
