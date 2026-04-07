@@ -1341,52 +1341,240 @@ async function loadDashboard() {
   const isSuperadmin = state.me?.role === 'superadmin';
 
   if (isSuperadmin) {
-    // Load cross-tenant stats
-    const [tenantsRes, regsRes, paymentsRes] = await Promise.all([
+    const [tenantsRes, regsRes, paymentsRes, docsRes] = await Promise.all([
       GET('/api/admin/tenants'),
       GET('/api/admin/registrations?limit=1'),
       GET('/api/admin/payments?limit=1'),
+      GET('/api/admin/documents?limit=1'),
     ]);
 
     const tenantCount = tenantsRes?.data?.length ?? '–';
     const totalRegs   = regsRes?.data?.total ?? '–';
     const totalPays   = paymentsRes?.data?.total ?? '–';
+    const totalDocs   = docsRes?.data?.total ?? 0;
+
+    const tenantOptions = (tenantsRes?.data || [])
+      .map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
 
     el.innerHTML = `
       <div class="stats-grid">
         <div class="stat-card"><div class="label">Active Tenants</div><div class="value">${tenantCount}</div></div>
         <div class="stat-card"><div class="label">Total Registrations</div><div class="value">${totalRegs}</div></div>
         <div class="stat-card"><div class="label">Total Payments</div><div class="value">${totalPays}</div></div>
+        <div class="stat-card" style="${totalDocs > 0 ? 'border-left:3px solid var(--danger)' : ''}">
+          <div class="label">Docs Awaiting Review</div>
+          <div class="value" style="${totalDocs > 0 ? 'color:var(--danger)' : ''}">${totalDocs}</div>
+        </div>
       </div>
       <div class="card">
         <h3>Recent Registrations (all tenants)</h3>
         <div id="dash-recent-regs"></div>
+      </div>
+      <div class="card" id="dash-docs-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+          <h3 style="margin:0;flex:1">Document Review Queue</h3>
+          <div class="form-group" style="margin:0;min-width:160px">
+            <select id="dash-doc-tenant" onchange="loadDashboardDocs()" style="padding:6px 10px;font-size:13px">
+              <option value="">All tenants</option>
+              ${tenantOptions}
+            </select>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="loadDashboardDocs()">↺ Refresh</button>
+        </div>
+        <div class="doc-split" id="dash-doc-split">
+          <div class="doc-list-pane">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Uploaded</th><th>Tenant</th><th>Policy</th><th>Customer</th><th>Flight</th><th>Status</th><th>AI</th></tr></thead>
+                <tbody id="dash-doc-body"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="dash-doc-pagination"></div>
+          </div>
+          <div class="doc-preview-pane empty" id="dash-doc-preview-pane">
+            <span>Select a document to preview</span>
+          </div>
+        </div>
       </div>`;
+
     renderRecentRegistrations('dash-recent-regs', regsRes?.data?.registrations || []);
+    loadDashboardDocs();
   } else {
-    const [regsRes, flightsRes, paymentsRes] = await Promise.all([
+    const [regsRes, flightsRes, paymentsRes, docsRes] = await Promise.all([
       GET('/api/admin/registrations?limit=5'),
       GET('/api/admin/flights?limit=1'),
       GET('/api/admin/payments?limit=1'),
+      GET('/api/admin/documents?limit=1'),
     ]);
 
-    const totalRegs  = regsRes?.data?.total ?? '–';
+    const totalRegs    = regsRes?.data?.total ?? '–';
     const totalFlights = flightsRes?.data?.total ?? '–';
-    const totalPays  = paymentsRes?.data?.total ?? '–';
-    const regs = regsRes?.data?.registrations || [];
-    const paidRegs = regs.filter(r => r.status === 'paid').length;
+    const totalPays    = paymentsRes?.data?.total ?? '–';
+    const totalDocs    = docsRes?.data?.total ?? 0;
 
     el.innerHTML = `
       <div class="stats-grid">
         <div class="stat-card"><div class="label">Registrations</div><div class="value">${totalRegs}</div></div>
         <div class="stat-card"><div class="label">Flight Registrations</div><div class="value">${totalFlights}</div></div>
         <div class="stat-card"><div class="label">Payments</div><div class="value">${totalPays}</div></div>
+        <div class="stat-card" style="${totalDocs > 0 ? 'border-left:3px solid var(--danger)' : ''}">
+          <div class="label">Docs Awaiting Review</div>
+          <div class="value" style="${totalDocs > 0 ? 'color:var(--danger)' : ''}">${totalDocs}</div>
+        </div>
       </div>
       <div class="card">
         <h3>Recent Registrations</h3>
         <div id="dash-recent-regs"></div>
+      </div>
+      <div class="card" id="dash-docs-card" ${totalDocs === 0 ? 'style="display:none"' : ''}>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <h3 style="margin:0;flex:1">Document Review Queue</h3>
+          <button class="btn btn-outline btn-sm" onclick="loadDashboardDocs()">↺ Refresh</button>
+        </div>
+        <div class="doc-split" id="dash-doc-split">
+          <div class="doc-list-pane">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Uploaded</th><th>Policy</th><th>Customer</th><th>Flight</th><th>Status</th><th>AI</th></tr></thead>
+                <tbody id="dash-doc-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="dash-doc-pagination"></div>
+          </div>
+          <div class="doc-preview-pane empty" id="dash-doc-preview-pane">
+            <span>Select a document to preview</span>
+          </div>
+        </div>
       </div>`;
+
     renderRecentRegistrations('dash-recent-regs', regsRes?.data?.registrations || []);
+    if (totalDocs > 0) loadDashboardDocs();
+  }
+}
+
+let dashDocPage = 1;
+let dashDocSelectedId = null;
+let dashDocObjectUrl = null;
+
+async function loadDashboardDocs(page = 1) {
+  dashDocPage = page;
+  const isSuperadmin = state.me?.role === 'superadmin';
+  const params = new URLSearchParams({ page, limit: 50 });
+  const tenantEl = document.getElementById('dash-doc-tenant');
+  if (tenantEl?.value) params.set('tenant_id', tenantEl.value);
+
+  const res    = await GET(`/api/admin/documents?${params}`);
+  const tbody  = document.getElementById('dash-doc-body');
+  const colSpan = isSuperadmin ? 7 : 6;
+  if (!res?.ok) { tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty">Failed to load</td></tr>`; return; }
+
+  const { total, documents } = res.data;
+
+  // Update nav badge
+  const badge = document.getElementById('doc-review-badge');
+  if (total > 0) { badge.textContent = total; badge.style.display = ''; }
+  else badge.style.display = 'none';
+
+  if (!documents.length) {
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty">No documents awaiting review</td></tr>`;
+    renderPagination('dash-doc-pagination', 0, 50, page, loadDashboardDocs);
+    return;
+  }
+
+  tbody.innerHTML = documents.map(d => {
+    const st = DOC_STATUS_LABELS[d.match_status] || { label: d.match_status, cls: 'badge-gray' };
+    const aiCell = d.ai_genuine !== null && d.ai_genuine !== undefined
+      ? `<span class="badge ${d.ai_genuine ? 'badge-green' : 'badge-red'}" title="${esc(d.ai_reason || '')}">${d.ai_genuine ? 'Genuine' : 'Suspect'}</span>`
+      : '<span class="text-muted">–</span>';
+    const flightCell = d.flight_number
+      ? `${d.flight_number}<br><small class="text-muted">${d.dep_date ? String(d.dep_date).slice(0,10) : ''}</small>`
+      : '<span class="text-muted">–</span>';
+    const selected = d.id === dashDocSelectedId ? ' class="doc-row-selected"' : '';
+
+    return `<tr${selected} style="cursor:pointer" onclick="previewDashDoc(${d.id},'${esc(d.original_name)}','${esc(d.mime_type||'')}',${!!d.pending_flight_event_id && d.flight_status==='awaiting_document'})">
+      <td class="text-muted"><small>${fmtDateTime(d.uploaded_at)}</small></td>
+      ${isSuperadmin ? `<td><small>${esc(d.tenant_name)}</small></td>` : ''}
+      <td class="mono"><small>${esc(d.policy_number)}<br><span class="text-muted">${esc(d.first_name||'')} ${esc(d.last_name||'')}</span></small></td>
+      <td><small>${esc(d.email)}</small></td>
+      <td class="mono"><small>${flightCell}</small></td>
+      <td><span class="badge ${st.cls}">${st.label}</span></td>
+      <td>${aiCell}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('dash-doc-pagination', total, 50, page, loadDashboardDocs);
+}
+
+async function previewDashDoc(id, name, mime, awaitingPayment) {
+  dashDocSelectedId = id;
+  document.querySelectorAll('#dash-doc-body tr').forEach(tr => tr.classList.remove('doc-row-selected'));
+  event.currentTarget.classList.add('doc-row-selected');
+
+  const pane = document.getElementById('dash-doc-preview-pane');
+  if (!pane) return;
+  pane.className = 'doc-preview-pane';
+  pane.oncontextmenu = e => e.preventDefault();
+  pane.innerHTML = `
+    <div class="doc-preview-header">
+      <span class="doc-name" title="${esc(name)}">${esc(name)}</span>
+      ${awaitingPayment ? '<span class="badge badge-yellow" style="flex-shrink:0">payment held</span>' : ''}
+      <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="reviewDashDoc(${id},'approve')">Approve</button>
+      <button class="btn btn-danger btn-sm"  style="flex-shrink:0" onclick="reviewDashDoc(${id},'reject')">Reject</button>
+    </div>
+    <div id="dash-doc-preview-body" class="doc-preview-body" style="display:flex;align-items:center;justify-content:center;min-height:200px;padding:12px">
+      <div class="spinner"></div>
+    </div>`;
+
+  if (dashDocObjectUrl) { URL.revokeObjectURL(dashDocObjectUrl); dashDocObjectUrl = null; }
+
+  try {
+    const headers = {};
+    if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+    const response = await fetch(`/api/admin/documents/${id}/content`, { headers });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blobData = await response.blob();
+    const body = document.getElementById('dash-doc-preview-body');
+    if (!body) return;
+
+    if (blobData.type.startsWith('image/')) {
+      const objectUrl = URL.createObjectURL(blobData);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const canvas = document.createElement('canvas');
+        const maxW = body.clientWidth || 600;
+        const scale = Math.min(1, maxW / img.naturalWidth);
+        canvas.width  = Math.round(img.naturalWidth  * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        body.style.padding = '0'; body.style.display = 'block';
+        body.innerHTML = ''; body.appendChild(canvas);
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); body.innerHTML = '<span style="color:var(--muted)">Could not render image</span>'; };
+      img.src = objectUrl;
+    } else {
+      dashDocObjectUrl = URL.createObjectURL(blobData);
+      body.style.padding = '0'; body.style.display = 'block';
+      body.innerHTML = `<iframe src="${dashDocObjectUrl}#toolbar=0&navpanes=0" class="doc-preview-frame" title="${esc(name)}"></iframe>`;
+    }
+  } catch (err) {
+    const body = document.getElementById('dash-doc-preview-body');
+    if (body) body.innerHTML = `<span style="color:var(--muted)">Could not load: ${esc(err.message)}</span>`;
+  }
+}
+
+async function reviewDashDoc(id, action) {
+  const label = action === 'approve' ? 'approve this document (this may trigger a payment)' : 'reject this document';
+  if (!confirm(`Are you sure you want to ${label}?`)) return;
+  const res = await PATCH(`/api/admin/documents/${id}`, { action });
+  if (res?.ok) {
+    dashDocSelectedId = null;
+    if (dashDocObjectUrl) { URL.revokeObjectURL(dashDocObjectUrl); dashDocObjectUrl = null; }
+    const pane = document.getElementById('dash-doc-preview-pane');
+    if (pane) { pane.className = 'doc-preview-pane empty'; pane.innerHTML = '<span>Select a document to preview</span>'; }
+    loadDashboardDocs(dashDocPage);
+  } else {
+    alert(res?.data?.error || 'Action failed');
   }
 }
 
