@@ -1168,26 +1168,21 @@
     .match-pending   { background: var(--border); color: var(--muted); }
     .match-info      { background: var(--brand-light); color: var(--brand-dark); }
 
-    .portal-upload-area { margin-top: 14px; }
+    .portal-upload-area { margin-top: 10px; }
     .portal-upload-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: 100%;
-      padding: 12px 16px;
-      background: var(--brand);
-      color: #fff;
-      border: none;
+      display: inline-block;
+      padding: 7px 14px;
+      background: var(--brand-light);
+      color: var(--brand);
+      border: 1px dashed var(--brand);
       border-radius: var(--radius-sm);
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.15s;
-      box-sizing: border-box;
+      transition: background 0.15s;
     }
-    .portal-upload-btn:hover { opacity: 0.88; }
-    .portal-upload-hint { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }
+    .portal-upload-btn:hover { background: #f9e8ef; }
+    .portal-upload-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
     .evidence-accepted {
       margin-top: 10px;
@@ -1581,16 +1576,14 @@
 
         <div id="upload-list"></div>
 
-        <label for="upload-input" class="btn btn-primary" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;cursor:pointer;font-size:14px;">
-          📎 Upload booking confirmation or e-ticket
-        </label>
-        <input type="file" id="upload-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none" onchange="handleFileInput(this)">
-        <div class="upload-drop" id="upload-drop" style="margin-top:10px"
+        <div class="upload-drop" id="upload-drop"
              ondragover="event.preventDefault();this.classList.add('dragover')"
              ondragleave="this.classList.remove('dragover')"
              ondrop="handleDrop(event)">
-          <div class="upload-drop-text" style="font-size:13px">or drag a file here</div>
-          <div class="upload-drop-hint">PDF, JPEG or PNG · max 10 MB</div>
+          <div class="upload-drop-icon">📎</div>
+          <div class="upload-drop-text">Drag a file here or <label for="upload-input" style="color:var(--brand);cursor:pointer;font-weight:600">browse</label></div>
+          <div class="upload-drop-hint">PDF, JPEG or PNG · max 10 MB per file</div>
+          <input type="file" id="upload-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none" onchange="handleFileInput(this)">
         </div>
 
         <div id="upload-error" class="alert alert-error" style="display:none;margin-top:12px;"></div>
@@ -3281,9 +3274,8 @@ function renderPortalFlightCard(flight, reg) {
        </div>`
     : `<div class="portal-upload-area">
          <label class="portal-upload-btn" for="portal-file-${flight.id}">
-           📎 Upload booking confirmation or e-ticket
+           + Upload booking confirmation or e-ticket
          </label>
-         <div class="portal-upload-hint">PDF, JPEG or PNG · required to process your claim automatically</div>
          <input type="file" id="portal-file-${flight.id}"
                 accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none"
                 onchange="portalUploadFile(${flight.id}, this)">
