@@ -347,9 +347,7 @@ async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = fals
  */
 async function validatePolicy(tenant, policyNumber, email, options = {}) {
   if (tenant.policy_api_mode === 'live') {
-    // In UAT the policy system may have placeholder emails — skip email match so testing isn't blocked.
-    const skipEmailMatch = options.skipEmailMatch || process.env.NODE_ENV === 'uat';
-    return liveValidate(tenant, policyNumber, email, { ...options, skipEmailMatch });
+    return liveValidate(tenant, policyNumber, email, options);
   }
   return stubValidate(policyNumber, email);
 }
