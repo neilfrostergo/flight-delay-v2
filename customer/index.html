@@ -983,14 +983,28 @@
       margin-bottom: 14px;
       display: flex; align-items: center; gap: 6px;
     }
+    .p-scheme-name {
+      font-size: 15px; font-weight: 700; color: var(--text);
+      margin-bottom: 14px; line-height: 1.3;
+    }
+    .p-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px;
+      margin-bottom: 2px;
+    }
+    .p-grid-full { grid-column: 1 / -1; }
+    .p-cell { display: flex; flex-direction: column; gap: 3px; }
+    .p-label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+    .p-value { font-size: 13px; font-weight: 600; color: var(--text); }
+    .p-value-mono { font-family: 'Courier New', monospace; color: var(--brand); font-weight: 700; font-size: 13px; }
+    .p-divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+    .p-payout { font-size: 22px; font-weight: 800; color: var(--brand); line-height: 1; }
+    .p-payout-sub { font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+    /* legacy row style retained for other sections */
     .p-row {
       display: flex; justify-content: space-between; align-items: baseline;
       padding: 5px 0; border-bottom: 1px solid var(--border);
     }
     .p-row:last-child { border-bottom: none; }
-    .p-label { font-size: 12px; color: var(--muted); font-weight: 500; }
-    .p-value { font-size: 14px; font-weight: 600; text-align: right; max-width: 60%; }
-    .p-value-mono { font-family: 'Courier New', monospace; color: var(--brand); font-weight: 700; font-size: 15px; }
 
     /* ── Cover period bar ── */
     .portal-period-bar-wrap { margin-top: 6px; }
@@ -3030,52 +3044,60 @@ function renderPortalDash(reg) {
   const policyCardHtml = `
     <div class="p-card">
       <div class="p-card-title">📋 Policy details</div>
-      <div class="p-row">
-        <span class="p-label">Policy number</span>
-        <span class="p-value p-value-mono">${escHtml(reg.policy_number)}</span>
+
+      ${reg.scheme_name ? `<div class="p-scheme-name">${escHtml(reg.scheme_name)}</div>` : ''}
+
+      <div class="p-grid">
+        <div class="p-cell p-grid-full">
+          <span class="p-label">Policy number</span>
+          <span class="p-value p-value-mono">${escHtml(reg.policy_number)}</span>
+        </div>
+        ${policyTypeLabel ? `
+        <div class="p-cell p-grid-full">
+          <span class="p-label">Policy type</span>
+          <span class="p-value"><span class="portal-pill portal-pill-blue" style="font-size:11px">${escHtml(policyTypeLabel)}</span></span>
+        </div>` : ''}
+        ${reg.geographic_area ? `
+        <div class="p-cell">
+          <span class="p-label">Destination</span>
+          <span class="p-value">${escHtml(reg.geographic_area)}</span>
+        </div>` : ''}
+        ${reg.policy_issue_date ? `
+        <div class="p-cell">
+          <span class="p-label">Issued</span>
+          <span class="p-value">${fmtDate(reg.policy_issue_date)}</span>
+        </div>` : ''}
       </div>
-      ${reg.scheme_name ? `
-      <div class="p-row">
-        <span class="p-label">Policy name</span>
-        <span class="p-value">${escHtml(reg.scheme_name)}</span>
-      </div>` : ''}
-      ${policyTypeLabel ? `
-      <div class="p-row">
-        <span class="p-label">Policy type</span>
-        <span class="p-value"><span class="portal-pill portal-pill-blue" style="font-size:12px">${escHtml(policyTypeLabel)}</span></span>
-      </div>` : ''}
-      ${reg.cover_start_date ? `
-      <div class="p-row">
-        <span class="p-label">Cover start</span>
-        <span class="p-value">${fmtDate(reg.cover_start_date)}</span>
+
+      <hr class="p-divider">
+
+      <div class="p-grid">
+        <div class="p-cell">
+          <span class="p-label">Delay payout</span>
+          <div class="p-payout">${payoutPounds}</div>
+          <div class="p-payout-sub">per person</div>
+        </div>
+        ${state.tenant && state.tenant.minHoursBeforeDep ? `
+        <div class="p-cell">
+          <span class="p-label">Delay threshold</span>
+          <span class="p-value">${state.tenant.minHoursBeforeDep} hours</span>
+        </div>` : ''}
+        ${reg.cover_start_date ? `
+        <div class="p-cell">
+          <span class="p-label">Cover start</span>
+          <span class="p-value">${fmtDate(reg.cover_start_date)}</span>
+        </div>
+        <div class="p-cell">
+          <span class="p-label">Cover end</span>
+          <span class="p-value">${fmtDate(reg.cover_end_date)}</span>
+        </div>` : ''}
       </div>
-      <div class="p-row">
-        <span class="p-label">Cover end</span>
-        <span class="p-value">${fmtDate(reg.cover_end_date)}</span>
-      </div>` : ''}
-      <div class="p-row">
-        <span class="p-label">Delay payout</span>
-        <span class="p-value" style="color:var(--brand);font-size:16px;font-weight:800">${payoutPounds} <span style="font-size:12px;font-weight:400;color:var(--muted)">per person</span></span>
-      </div>
-      ${state.tenant && state.tenant.minHoursBeforeDep ? `
-      <div class="p-row">
-        <span class="p-label">Delay threshold</span>
-        <span class="p-value">${state.tenant.minHoursBeforeDep} hours</span>
-      </div>` : ''}
-      ${reg.geographic_area ? `
-      <div class="p-row">
-        <span class="p-label">Destination</span>
-        <span class="p-value">${escHtml(reg.geographic_area)}</span>
-      </div>` : ''}
-      ${reg.policy_issue_date ? `
-      <div class="p-row">
-        <span class="p-label">Policy issued</span>
-        <span class="p-value">${fmtDate(reg.policy_issue_date)}</span>
-      </div>` : ''}
+
       ${docLinksHtml ? `
-      <div class="p-row" style="align-items:center">
+      <hr class="p-divider">
+      <div class="p-cell">
         <span class="p-label">Documents</span>
-        <span class="p-value" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${docLinksHtml}</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${docLinksHtml}</div>
       </div>` : ''}
     </div>`;
 
