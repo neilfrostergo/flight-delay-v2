@@ -265,6 +265,7 @@ async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = fals
     }
 
     body = await res.json();
+    console.log('[policyValidator] RAW RESPONSE:', JSON.stringify(body, null, 2));
   } catch (err) {
     console.error('[policyValidator] Policy API request failed:', err.message);
     return { valid: false, errorMessage: 'Policy validation service unavailable' };
