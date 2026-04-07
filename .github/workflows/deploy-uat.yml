@@ -56,4 +56,5 @@ jobs:
             --name fdv2-uat-app \
             --resource-group fdv2-uat-rg \
             --image fdv2acr.azurecr.io/fdv2-app:develop-${{ github.sha }} \
-            --set-env-vars "APP_VERSION=${GITHUB_SHA:0:7}"
+            --set-env-vars "APP_VERSION=${GITHUB_SHA:0:7}" \
+            --set-env-vars "DEPLOY_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"

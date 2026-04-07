@@ -1283,7 +1283,8 @@ async function initApp() {
       state.env = cfg.env || 'development';
       if (cfg.env === 'uat') {
         const ver = cfg.appVersion ? ` · build ${cfg.appVersion}` : '';
-        document.getElementById('uat-banner').textContent = `⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS${ver}`;
+        const dt  = cfg.deployTime ? ` · deployed ${new Date(cfg.deployTime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/London' })}` : '';
+        document.getElementById('uat-banner').textContent = `⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS${ver}${dt}`;
         document.getElementById('uat-banner').style.display = '';
       }
     }

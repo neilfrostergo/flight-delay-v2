@@ -1762,7 +1762,8 @@ const state = {
       document.querySelectorAll('#min-hours').forEach(el => el.textContent = state.minHoursBeforeDep);
       if (state.tenant.env === 'uat') {
         const ver = state.tenant.appVersion ? ` · build ${state.tenant.appVersion}` : '';
-        document.getElementById('uat-banner').textContent = `⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS${ver}`;
+        const dt  = state.tenant.deployTime ? ` · deployed ${new Date(state.tenant.deployTime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/London' })}` : '';
+        document.getElementById('uat-banner').textContent = `⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS${ver}${dt}`;
         document.getElementById('uat-banner').style.display = '';
       }
     }
