@@ -340,6 +340,7 @@ async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = fals
     coverSummary,
     geographicArea: policy.destinationName || null,
     policyIssueDate: policy.dateIssued || null,
+    schemeName: policy.scheme?.friendlyName || null,
     policyWordingUrl:  policy.policyWordingDocumentUrl || null,
     policyWordingName: 'Policy Wording',
     ipidUrl:           policy.ipidFileUrl || null,

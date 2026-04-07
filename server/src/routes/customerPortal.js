@@ -111,7 +111,7 @@ router.post('/sessions', async (req, res) => {
     `SELECT policy_number, policy_type, travelers, cover_summary,
             policy_wording_url, policy_wording_name,
             ipid_url, ipid_name, key_facts_url, key_facts_name,
-            geographic_area, policy_issue_date
+            geographic_area, policy_issue_date, scheme_name
      FROM registrations WHERE id = $1`,
     [registrationId]
   );
@@ -131,10 +131,11 @@ router.post('/sessions', async (req, res) => {
     key_facts_name:       regDetailRow.key_facts_name       || null,
     geographic_area:      regDetailRow.geographic_area      || null,
     policy_issue_date:    regDetailRow.policy_issue_date    || null,
+    scheme_name:          regDetailRow.scheme_name          || null,
   };
 
   // Re-validate if any key fields are missing (handles registrations created before these columns existed)
-  if (!policyDetail.policy_type || !policyDetail.policy_wording_url || !policyDetail.geographic_area || !policyDetail.policy_issue_date) {
+  if (!policyDetail.policy_type || !policyDetail.policy_wording_url || !policyDetail.geographic_area || !policyDetail.policy_issue_date || !policyDetail.scheme_name) {
     const fresh = await validatePolicy(req.tenant, regDetailRow.policy_number, email.trim());
     if (fresh.valid) {
       policyDetail = {
@@ -149,6 +150,7 @@ router.post('/sessions', async (req, res) => {
         key_facts_name:       fresh.keyFactsName        || null,
         geographic_area:      fresh.geographicArea      || policyDetail.geographic_area   || null,
         policy_issue_date:    fresh.policyIssueDate     || policyDetail.policy_issue_date || null,
+        scheme_name:          fresh.schemeName          || policyDetail.scheme_name       || null,
       };
       // Backfill so subsequent logins don't need to re-validate
       await query(
@@ -156,8 +158,8 @@ router.post('/sessions', async (req, res) => {
             SET policy_type=$1, travelers=$2, cover_summary=$3,
                 policy_wording_url=$4, policy_wording_name=$5,
                 ipid_url=$6, ipid_name=$7, key_facts_url=$8, key_facts_name=$9,
-                geographic_area=$10, policy_issue_date=$11
-          WHERE id=$12`,
+                geographic_area=$10, policy_issue_date=$11, scheme_name=$12
+          WHERE id=$13`,
         [
           policyDetail.policy_type,
           JSON.stringify(policyDetail.travelers),
@@ -167,6 +169,7 @@ router.post('/sessions', async (req, res) => {
           policyDetail.key_facts_url,       policyDetail.key_facts_name,
           policyDetail.geographic_area,
           policyDetail.policy_issue_date,
+          policyDetail.scheme_name,
           registrationId,
         ]
       );
@@ -183,6 +186,7 @@ router.post('/sessions', async (req, res) => {
       cover_summary:     policyDetail.cover_summary,
       geographic_area:   policyDetail.geographic_area   || null,
       policy_issue_date: policyDetail.policy_issue_date || null,
+      scheme_name:       policyDetail.scheme_name       || null,
     },
     config.jwt.secret,
     { expiresIn: '24h' }
@@ -272,7 +276,7 @@ router.get('/registration', requireCustomer, async (req, res) => {
             policy_type, travelers, cover_summary,
             policy_wording_url, policy_wording_name,
             ipid_url, ipid_name, key_facts_url, key_facts_name,
-            geographic_area, policy_issue_date
+            geographic_area, policy_issue_date, scheme_name
      FROM registrations WHERE id = $1 AND tenant_id = $2`,
     [req.customer.sub, req.tenant.id]
   );

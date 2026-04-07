@@ -3034,6 +3034,11 @@ function renderPortalDash(reg) {
         <span class="p-label">Policy number</span>
         <span class="p-value p-value-mono">${escHtml(reg.policy_number)}</span>
       </div>
+      ${reg.scheme_name ? `
+      <div class="p-row">
+        <span class="p-label">Policy name</span>
+        <span class="p-value">${escHtml(reg.scheme_name)}</span>
+      </div>` : ''}
       ${policyTypeLabel ? `
       <div class="p-row">
         <span class="p-label">Policy type</span>
