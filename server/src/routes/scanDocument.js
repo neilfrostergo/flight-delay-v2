@@ -5,6 +5,7 @@ const multer  = require('multer');
 const os      = require('os');
 const fs      = require('fs');
 const { parseDocument } = require('../services/documentParser');
+const { verifyDocument, isAvailable: aiAvailable } = require('../services/documentVerifier');
 const { query } = require('../db/connection');
 
 const router = express.Router();
@@ -20,14 +21,41 @@ const upload = multer({
 
 // POST /api/scan-document — parse a document and return extracted flight/date hints.
 // No auth required; no data is saved to the database.
+// AI vision is used as primary source when available; regex is the fallback.
 router.post('/', upload.single('document'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   try {
     const parsed = await parseDocument(req.file.path, req.file.mimetype);
 
-    // Filter flight numbers to only those whose carrier prefix is a known IATA code.
-    // This removes booking references (e.g. ZNF0099) that match the regex but aren't flights.
+    // ── AI extraction (primary) ───────────────────────────────────────────────
+    // For PDFs rendered as images and JPEG/PNG uploads, ask the AI to identify
+    // the flight number and departure date directly. This is far more reliable
+    // than regex, which can't distinguish flight numbers from postcodes, booking
+    // references, insurance policy numbers, etc.
+    const canUseAI = aiAvailable() && (
+      parsed.parseMethod === 'pdf_image' ||
+      parsed.parseMethod === 'image'
+    );
+
+    if (canUseAI) {
+      try {
+        const aiResult = await verifyDocument(parsed, null);
+        if (aiResult.flightNumber) {
+          const flightNumbers = [aiResult.flightNumber];
+          const dates = aiResult.flightDate
+            ? [aiResult.flightDate]
+            : [...parsed.dates].sort((a, b) => b.localeCompare(a));
+          return res.json({ flightNumbers, dates });
+        }
+      } catch (aiErr) {
+        console.warn('[scanDocument] AI extraction failed, falling back to regex:', aiErr.message);
+      }
+    }
+
+    // ── Regex fallback ────────────────────────────────────────────────────────
+    // Filter flight numbers to only those whose carrier prefix is a known IATA
+    // code. This removes booking references that match the regex but aren't flights.
     let flightNumbers = parsed.flightNumbers;
     if (flightNumbers.length > 1) {
       const codes = flightNumbers.map(f => f.replace(/\d+$/, '').replace(/\s/g, ''));

@@ -404,21 +404,15 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
       const targetFlight = allFlights.rows.find(f => f.id === flightId);
       aiResult = await verifyDocument(parsed, targetFlight);
 
-      // If AI extracted a flight number that matches one of the registered flights,
-      // use it as the canonical source — it correctly distinguishes flight numbers
-      // from booking references. Only override regex if AI result is plausible
-      // (i.e. matches a registered flight), to avoid trusting a hallucinated value.
+      // AI is the primary source for flight identification.
+      // For pdf_image (vision) always trust the AI result — it reads the document
+      // directly and won't confuse postcodes or booking refs for flight numbers.
+      // For text PDFs the AI also extracts from the raw text; trust it unconditionally
+      // since GPT-4o is far more reliable than regex at this task.
       const { normaliseFlight } = require('../services/documentParser');
       if (aiResult.flightNumber) {
-        const aiNorm = normaliseFlight(aiResult.flightNumber);
-        const matchesRegistered = allFlights.rows.some(f => normaliseFlight(f.flight_number) === aiNorm);
-        if (matchesRegistered) {
-          parsed.flightNumbers = [aiResult.flightNumber];
-          if (aiResult.flightDate) parsed.dates = [aiResult.flightDate];
-        } else {
-          // AI returned a flight number that isn't registered — keep regex results
-          console.warn(`[customerPortal] AI flightNumber "${aiResult.flightNumber}" not in registered flights, keeping regex results`);
-        }
+        parsed.flightNumbers = [aiResult.flightNumber];
+        if (aiResult.flightDate) parsed.dates = [aiResult.flightDate];
       }
     }
 

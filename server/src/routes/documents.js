@@ -125,12 +125,8 @@ router.post('/:id/documents', upload.single('document'), async (req, res) => {
       parsed.blobKey = blobKey;
       aiResult = await verifyDocument(parsed, null);
       if (aiResult.flightNumber) {
-        const aiNorm = normaliseFlight(aiResult.flightNumber);
-        const matchesRegistered = allFlights.rows.some(f => normaliseFlight(f.flight_number) === aiNorm);
-        if (matchesRegistered) {
-          parsed.flightNumbers = [aiResult.flightNumber];
-          if (aiResult.flightDate) parsed.dates = [aiResult.flightDate];
-        }
+        parsed.flightNumbers = [aiResult.flightNumber];
+        if (aiResult.flightDate) parsed.dates = [aiResult.flightDate];
       }
     }
 
