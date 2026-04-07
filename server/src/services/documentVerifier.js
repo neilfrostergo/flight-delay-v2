@@ -27,8 +27,8 @@ Respond with a JSON object (no markdown) with these fields:
 - genuine: true if this appears to be an authentic travel booking confirmation, e-ticket, or itinerary from a real travel company or airline; false if it appears fabricated, minimal, or suspicious
 - confidence: "high" or "medium"
 - passengerName: the full passenger name found in the document, or null if not found
-- flightNumber: the flight number (e.g. "AA135", "BA177") found in the document, or null if not found. This is the IATA airline code + number shown next to "Flight No." or similar. Do NOT return the booking reference.
-- flightDate: the date the flight DEPARTS in YYYY-MM-DD format (e.g. "2026-04-28"), or null if not found. This is the travel/departure date, NOT the booking issue date or the date the document was created.
+- flightNumber: the operating flight number shown next to a label like "Flight No.", "Flight", or "Flight Number" (e.g. "AA135", "BA177"). This is always an airline IATA code (2 letters) followed by digits. Do NOT return the booking reference — booking references are shown under labels like "Booking Reference", "Booking Ref", "Reference", "PNR" or "Confirmation Code" and often contain hyphens or non-airline letter combinations.
+- flightDate: the scheduled departure date of the flight in YYYY-MM-DD format (e.g. "2026-04-28"). Look for labels like "Date", "Departure Date", "Departs", or "Travel Date" within the flight details section. Do NOT return the date the booking was issued/created (shown under labels like "Issued", "Booked", "Issue Date", "Created").
 - reason: one sentence explaining your assessment
 
 A genuine document will typically have: a booking reference, passenger name, airline/travel company branding or name, origin/destination airports, and flight number. Be suspicious of documents with only a flight number and date and nothing else.`;
