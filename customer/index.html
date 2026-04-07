@@ -1761,6 +1761,8 @@ const state = {
       state.maxDaysBeforeDep  = state.tenant.maxDaysBeforeDep  || 40;
       document.querySelectorAll('#min-hours').forEach(el => el.textContent = state.minHoursBeforeDep);
       if (state.tenant.env === 'uat') {
+        const ver = state.tenant.appVersion ? ` · build ${state.tenant.appVersion}` : '';
+        document.getElementById('uat-banner').textContent = `⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS${ver}`;
         document.getElementById('uat-banner').style.display = '';
       }
     }

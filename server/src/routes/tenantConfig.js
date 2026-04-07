@@ -26,6 +26,7 @@ router.get('/', (req, res) => {
     minHoursBeforeDep: req.tenant.min_hours_before_dep,
     maxDaysBeforeDep:  req.tenant.max_days_before_dep || 40,
     env:           config.nodeEnv,
+    appVersion:    process.env.APP_VERSION || null,
   });
 });
 

@@ -1282,6 +1282,8 @@ async function initApp() {
       const cfg = await cfgRes.json();
       state.env = cfg.env || 'development';
       if (cfg.env === 'uat') {
+        const ver = cfg.appVersion ? ` · build ${cfg.appVersion}` : '';
+        document.getElementById('uat-banner').textContent = `⚠️ UAT ENVIRONMENT — NOT FOR REAL REGISTRATIONS${ver}`;
         document.getElementById('uat-banner').style.display = '';
       }
     }
