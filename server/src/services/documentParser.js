@@ -54,6 +54,12 @@ function extractInfo(text) {
     addDate(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
   }
 
+  // DD-MMM-YYYY (e.g. 10-APR-2026 or 10-Apr-2026)
+  const re5 = /\b(\d{1,2})-(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*-(\d{4})\b/gi;
+  while ((m = re5.exec(text)) !== null) {
+    addDate(parseInt(m[3]), MONTHS[m[2].slice(0, 3).toLowerCase()], parseInt(m[1]));
+  }
+
   return { flightNumbers: [...flightNums], dates: [...dates] };
 }
 
@@ -109,12 +115,21 @@ async function parseDocument(filePath, mimeType) {
  * 'high'   = flight number AND date both found in the document.
  * 'medium' = flight number found but date could not be confirmed.
  */
+// Normalise a flight number for matching: strip spaces and leading zeros from
+// the numeric suffix so "BA0177", "BA177", and "BA 177" all compare equal.
+function normaliseFlight(raw) {
+  return String(raw).replace(/\s/g, '').toUpperCase()
+    .replace(/^([A-Z]{2,3})0+(\d)/, '$1$2'); // BA0177 → BA177
+}
+
 function matchFlights(parsed, registeredFlights) {
+  const normParsed = parsed.flightNumbers.map(normaliseFlight);
+
   for (const flight of registeredFlights) {
-    const num  = String(flight.flight_number).replace(/\s/g, '').toUpperCase();
+    const num  = normaliseFlight(flight.flight_number);
     const date = String(flight.dep_date).slice(0, 10); // YYYY-MM-DD
 
-    const hasNum  = parsed.flightNumbers.includes(num);
+    const hasNum  = normParsed.includes(num);
     const hasDate = parsed.dates.includes(date);
 
     if (hasNum && hasDate) return { flightId: flight.id, confidence: 'high',   reason: 'flight_and_date' };
