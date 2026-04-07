@@ -7,6 +7,7 @@ const Joi     = require('joi');
 const { query } = require('../../db/connection');
 const { adminTenantScope } = require('../../middleware/requireAdmin');
 const { sendSingleTripOutreach, sendReturnTripOutreach, sendAnnualMultiTripOutreach } = require('../../services/notificationService');
+const { validatePolicy } = require('../../services/policyValidator');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -105,15 +106,13 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/admin/tokens/send-outreach — send registration outreach email for a token
+// Policy type is looked up from PolicyHub automatically; no need for the admin to specify it.
 router.post('/send-outreach', async (req, res) => {
   const scope = adminTenantScope(req);
-  const { token_id, first_name, type } = req.body || {};
+  const { token_id, first_name } = req.body || {};
 
-  if (!token_id || !first_name || !type) {
-    return res.status(400).json({ error: 'token_id, first_name and type are required' });
-  }
-  if (!['single', 'return', 'amt'].includes(type)) {
-    return res.status(400).json({ error: 'type must be single, return or amt' });
+  if (!token_id || !first_name) {
+    return res.status(400).json({ error: 'token_id and first_name are required' });
   }
 
   const params = [token_id];
@@ -122,7 +121,8 @@ router.post('/send-outreach', async (req, res) => {
 
   const result = await query(
     `SELECT t.id, t.token, t.policy_number, t.email, t.used_at, t.expires_at,
-            tn.id AS tenant_id, tn.name, tn.primary_colour, tn.support_email, tn.subdomain
+            tn.id AS tenant_id, tn.name, tn.primary_colour, tn.support_email, tn.subdomain,
+            tn.policy_api_mode, tn.policy_api_key_id, tn.policy_api_coverholder_key, tn.cover_benefit_name
      FROM pre_validation_tokens t
      JOIN tenants tn ON tn.id = t.tenant_id
      WHERE t.id = $1 ${tenantClause}`,
@@ -135,15 +135,23 @@ router.post('/send-outreach', async (req, res) => {
   if (row.used_at) return res.status(400).json({ error: 'Token has already been used' });
   if (new Date(row.expires_at) < new Date()) return res.status(400).json({ error: 'Token has expired' });
 
-  const tenant = { id: row.tenant_id, name: row.name, primary_colour: row.primary_colour, support_email: row.support_email };
+  // Look up policy type from PolicyHub (email match skipped — placeholder emails in policy system)
+  const tenant = {
+    id: row.tenant_id, name: row.name, primary_colour: row.primary_colour, support_email: row.support_email,
+    policy_api_mode: row.policy_api_mode, policy_api_key_id: row.policy_api_key_id,
+    policy_api_coverholder_key: row.policy_api_coverholder_key, cover_benefit_name: row.cover_benefit_name,
+  };
+  const policyResult = await validatePolicy(tenant, row.policy_number, row.email, { skipEmailMatch: true });
+  const policyType = policyResult.valid ? (policyResult.policyType || 'annual_multi_trip') : 'annual_multi_trip';
+
   const tokenUrl = `https://${row.subdomain}/register?token=${row.token}`;
   const args = { firstName: first_name, email: row.email, policyNumber: row.policy_number, tokenUrl, tenant };
 
-  if (type === 'single') await sendSingleTripOutreach(args);
-  else if (type === 'return') await sendReturnTripOutreach(args);
+  if (policyType === 'single_trip') await sendSingleTripOutreach(args);
+  else if (policyType === 'return_trip') await sendReturnTripOutreach(args);
   else await sendAnnualMultiTripOutreach(args);
 
-  return res.json({ ok: true });
+  return res.json({ ok: true, policyType });
 });
 
 // POST /api/admin/tokens/import — bulk generate tokens from CSV upload

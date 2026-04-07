@@ -995,14 +995,7 @@
       <input id="or-firstname" placeholder="e.g. Sarah" />
       <small>Used to personalise the email greeting.</small>
     </div>
-    <div class="form-group">
-      <label>Policy Type</label>
-      <select id="or-type">
-        <option value="single">Single Trip</option>
-        <option value="return">Return Trip</option>
-        <option value="amt">Annual Multi-Trip (AMT)</option>
-      </select>
-    </div>
+
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-outreach')">Cancel</button>
       <button class="btn btn-primary" onclick="sendOutreachEmail()">Send Email</button>
@@ -2260,7 +2253,6 @@ function openOutreachModal(tokenId, policyNumber, email) {
   document.getElementById('or-policy').value   = policyNumber;
   document.getElementById('or-email').value    = email;
   document.getElementById('or-firstname').value = '';
-  document.getElementById('or-type').value     = 'single';
   document.getElementById('outreach-error').style.display   = 'none';
   document.getElementById('outreach-success').style.display = 'none';
   openModal('modal-outreach');
@@ -2278,7 +2270,6 @@ async function sendOutreachEmail() {
   const body = {
     token_id:   parseInt(document.getElementById('or-token-id').value, 10),
     first_name: firstName,
-    type:       document.getElementById('or-type').value,
   };
 
   const res = await POST('/api/admin/tokens/send-outreach', body);
