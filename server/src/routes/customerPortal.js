@@ -305,7 +305,6 @@ router.get('/registration', requireCustomer, async (req, res) => {
 
 // ── POST /api/customer/flights/:flightId/documents — upload + analyse ─────────
 router.post('/flights/:flightId/documents', requireCustomer, upload.single('document'), async (req, res) => {
-  console.log(`[upload] START flightId=${req.params.flightId} file=${req.file?.originalname} mime=${req.file?.mimetype} size=${req.file?.size} path=${req.file?.path}`);
   if (!req.tenant || req.customer.tenant_id !== req.tenant.id) {
     return res.status(403).json({ error: 'Forbidden' });
   }
@@ -357,19 +356,16 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
   // ── Upload to blob storage (replaces local file in UAT/prod) ──────────────
   const blobKey = blob.blobName(registrationId, req.file.filename);
   let blobUrl;
-  console.log(`[upload] BLOB START blobKey=${blobKey} blobAvailable=${blob.isAvailable()}`);
   try {
     blobUrl = await blob.uploadFile(req.file.path, blobKey, req.file.mimetype);
     if (blobUrl) {
       await query(`UPDATE registration_documents SET blob_url = $1 WHERE id = $2`, [blobUrl, doc.id]);
     }
   } catch (blobErr) {
-    console.error(`[upload] BLOB FAILED:`, blobErr.message);
     fs.unlink(req.file.path, () => {});
     await query('DELETE FROM registration_documents WHERE id = $1', [doc.id]);
     return res.status(500).json({ error: 'Document storage unavailable — please try again shortly' });
   }
-  console.log(`[upload] BLOB DONE blobUrl=${blobUrl}`);
   // If blob upload succeeded, req.file.path is deleted. parseDocument will
   // read from blob; if not available (local dev), local path still exists.
 
@@ -380,7 +376,6 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
     if (blob.isAvailable()) {
       const os   = require('os');
       const tmp  = path.join(os.tmpdir(), req.file.filename);
-      console.log(`[upload] DOWNLOAD START tmp=${tmp}`);
       await blob.downloadToTemp(blobKey, tmp);
       filePath = tmp;
     }
@@ -497,11 +492,10 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
       }
     }
   } catch (analysisErr) {
-    console.error('[upload] ANALYSIS ERROR:', analysisErr.message, analysisErr.stack);
+    console.error('[customerPortal] Document analysis error:', analysisErr.message);
     // Don't fail the upload — just return pending status
   }
 
-  console.log(`[upload] DONE docId=${doc.id} matchStatus=${doc.match_status}`);
   return res.status(201).json(doc);
 });
 
