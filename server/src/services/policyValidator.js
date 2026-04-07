@@ -198,7 +198,7 @@ function stubValidate(policyNumber, email) {
 // Active status code in PolicyHub
 const POLICYHUB_STATUS_ACTIVE = 3;
 
-async function liveValidate(tenant, policyNumber, email) {
+async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = false } = {}) {
   if (!tenant.policy_api_key_id) {
     return { valid: false, errorMessage: 'No policy API configured for this tenant' };
   }
@@ -255,10 +255,13 @@ async function liveValidate(tenant, policyNumber, email) {
     return { valid: false, errorMessage: 'Policy is not active' };
   }
 
-  // Email must match the lead client (case-insensitive)
-  const leadClient = (policy.clients || []).find(c => c.relationshipId === 1) || policy.clients?.[0];
-  if (!leadClient?.email || leadClient.email.toLowerCase() !== email.toLowerCase()) {
-    return { valid: false, errorMessage: 'Email address does not match policy records' };
+  // Email must match the lead client (case-insensitive) — skipped in token flow
+  // where the token itself is the identity proof and the policy system may have placeholder emails.
+  if (!skipEmailMatch) {
+    const leadClient = (policy.clients || []).find(c => c.relationshipId === 1) || policy.clients?.[0];
+    if (!leadClient?.email || leadClient.email.toLowerCase() !== email.toLowerCase()) {
+      return { valid: false, errorMessage: 'Email address does not match policy records' };
+    }
   }
 
   // Find the flight delay cover benefit in scheme.schemeCover
@@ -339,10 +342,10 @@ async function liveValidate(tenant, policyNumber, email) {
  *   errorMessage?: string
  * }>}
  */
-async function validatePolicy(tenant, policyNumber, email) {
+async function validatePolicy(tenant, policyNumber, email, options = {}) {
   const env = process.env.NODE_ENV;
   if (tenant.policy_api_mode === 'live' && env !== 'uat' && env !== 'development') {
-    return liveValidate(tenant, policyNumber, email);
+    return liveValidate(tenant, policyNumber, email, options);
   }
   return stubValidate(policyNumber, email);
 }

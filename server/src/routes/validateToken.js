@@ -53,8 +53,10 @@ router.post('/', async (req, res) => {
     [tokenRow.id]
   );
 
-  // Validate the policy (using the email + policy number stored in the token)
-  const result = await validatePolicy(req.tenant, tokenRow.policy_number, tokenRow.email);
+  // Validate the policy using the policy number stored in the token.
+  // Email match is skipped — the token itself is the identity proof; the policy system
+  // may have placeholder emails (e.g. noreply@...) that don't match the customer's real address.
+  const result = await validatePolicy(req.tenant, tokenRow.policy_number, tokenRow.email, { skipEmailMatch: true });
 
   if (!result.valid) {
     return res.status(422).json({ error: result.errorMessage || 'Policy validation failed' });
