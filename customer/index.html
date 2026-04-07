@@ -2802,9 +2802,12 @@ function hidePortal() {
   if (state.step > 1) document.getElementById('stepper').style.display = 'flex';
   const btn = document.getElementById('portal-toggle-btn');
   btn.textContent = state.tenant?.portalLabel || 'My Account';
-  const show = portalState.token ? '' : 'none';
-  btn.style.display = show;
-  document.getElementById('portal-logout-pill').style.display = show;
+  // Keep pills visible if the user has an active portal session OR is mid-registration.
+  // Without this, clicking the toggle while the portal shows a login form (e.g. after
+  // session expiry) would hide the pills and leave the user with no navigation.
+  const hasContext = !!(portalState.token || state.validated?.policyNumber);
+  btn.style.display = hasContext ? '' : 'none';
+  document.getElementById('portal-logout-pill').style.display = hasContext ? '' : 'none';
 }
 
 function portalLogout() {
@@ -2879,9 +2882,9 @@ async function showPortalDash() {
     const data = await res.json();
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
-        // Token expired or invalid — clear session and hide header buttons
+        // Token expired or invalid — show the login form so the user can re-authenticate.
+        // Keep the toggle button visible so they can dismiss the portal if they want.
         portalClearSession();
-        document.getElementById('portal-toggle-btn').style.display = 'none';
         document.getElementById('portal-logout-pill').style.display = 'none';
         document.getElementById('portal-dash').style.display = 'none';
         document.getElementById('portal-login').style.display = '';
