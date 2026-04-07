@@ -658,6 +658,23 @@
               </div>
               <button class="btn btn-primary" onclick="injectEvent()">Inject Event</button>
             </div>
+
+            <!-- OAG Event Hub payload tester — hidden in production -->
+            <div class="card" id="oag-sim-card" style="display:none;margin-top:16px">
+              <h3>OAG Event Hub Payload Tester</h3>
+              <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+                Paste a raw OAG Event Hub JSON payload to test field mapping without a real Event Hub connection.
+                Shows exactly what <code>mapAndStoreOAGEvent()</code> will extract.
+              </p>
+              <div id="oag-sim-error" class="alert alert-error" style="display:none"></div>
+              <div id="oag-sim-success" class="alert alert-success" style="display:none"></div>
+              <div class="form-group">
+                <label>OAG JSON Payload</label>
+                <textarea id="oag-payload" rows="8" style="font-family:monospace;font-size:12px;resize:vertical" placeholder='{"carrierCode":"BA","flightNumber":"177","departureDate":"2026-04-08","state":"InGate","departure":{"outGateVariation":185}}'></textarea>
+              </div>
+              <div id="oag-sim-parsed" style="display:none;margin-bottom:12px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;font-family:monospace"></div>
+              <button class="btn btn-primary" onclick="sendOagPayload()">Test Payload</button>
+            </div>
           </div>
           <div>
             <div class="card">
@@ -2298,6 +2315,10 @@ async function loadSimulator() {
     sel.innerHTML = '<option value="">No active subscriptions</option>';
   }
 
+  // Show OAG payload tester only in non-production environments
+  const isProduction = state.tenant?.env === 'production' || (!state.tenant?.env && window.location.hostname !== 'localhost');
+  document.getElementById('oag-sim-card').style.display = isProduction ? 'none' : '';
+
   // Load recent notifications
   loadSimNotifications();
 }
@@ -2341,6 +2362,44 @@ async function injectEvent() {
   sucEl.style.display = '';
 
   // Refresh notifications after 2s
+  setTimeout(loadSimNotifications, 2000);
+}
+
+async function sendOagPayload() {
+  const errEl    = document.getElementById('oag-sim-error');
+  const sucEl    = document.getElementById('oag-sim-success');
+  const parsedEl = document.getElementById('oag-sim-parsed');
+  errEl.style.display = 'none';
+  sucEl.style.display = 'none';
+  parsedEl.style.display = 'none';
+
+  let payload;
+  try {
+    payload = JSON.parse(document.getElementById('oag-payload').value);
+  } catch {
+    errEl.textContent = 'Invalid JSON — check your payload';
+    errEl.style.display = '';
+    return;
+  }
+
+  const res = await POST('/api/admin/simulator/oag-event', payload);
+
+  if (!res?.ok) {
+    errEl.textContent = res?.data?.error || 'Failed';
+    errEl.style.display = '';
+    // Show parsed fields even on error so you can see what was extracted
+    if (res?.data?.parsed) {
+      parsedEl.textContent = 'Extracted fields:\n' + JSON.stringify(res.data.parsed, null, 2);
+      parsedEl.style.display = '';
+    }
+    return;
+  }
+
+  const p = res.data.parsed;
+  sucEl.textContent = `Processed — event ID ${res.data.eventId}. Poller will complete within 30s.`;
+  sucEl.style.display = '';
+  parsedEl.textContent = `Extracted fields:\n${JSON.stringify(p, null, 2)}`;
+  parsedEl.style.display = '';
   setTimeout(loadSimNotifications, 2000);
 }
 

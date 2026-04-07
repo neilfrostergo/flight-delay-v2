@@ -4,6 +4,7 @@ const express = require('express');
 const Joi     = require('joi');
 const { query } = require('../../db/connection');
 const { adminTenantScope } = require('../../middleware/requireAdmin');
+const config  = require('../../config');
 
 const router = express.Router();
 
@@ -77,6 +78,69 @@ router.post('/event', async (req, res) => {
   );
 
   return res.status(201).json({ eventId: result.rows[0].id, message: 'Event injected — poller will process within 30s' });
+});
+
+// POST /api/admin/simulator/oag-event — simulate a raw OAG Event Hub payload
+// Tests the field-mapping logic in eventHubConsumer without a real Event Hub connection.
+// BLOCKED IN PRODUCTION.
+router.post('/oag-event', async (req, res) => {
+  if (config.isProduction) {
+    return res.status(403).json({ error: 'OAG payload simulation is not available in production' });
+  }
+
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    return res.status(400).json({ error: 'Request body must be a JSON object' });
+  }
+
+  // Run the same mapping logic as eventHubConsumer.mapAndStoreOAGEvent
+  const carrierCode  = body.carrierCode  || body.carrier?.iata;
+  const flightNumber = body.flightNumber || body.flightNum;
+  const depDate      = body.departureDate || body.departure?.date?.local;
+  const state        = body.state || body.flightState || 'Unknown';
+  const delayMinutes = Math.max(0, body.departure?.outGateVariation || body.delayMinutes || 0);
+
+  if (!carrierCode || !flightNumber || !depDate) {
+    return res.status(422).json({
+      error: 'Payload must contain carrierCode (or carrier.iata), flightNumber (or flightNum), and departureDate (or departure.date.local)',
+      parsed: { carrierCode, flightNumber, depDate, state, delayMinutes },
+    });
+  }
+
+  const subResult = await query(
+    `SELECT id FROM flight_alert_subscriptions
+     WHERE carrier_code = $1 AND flight_number = $2 AND dep_date = $3 AND status = 'active'
+     LIMIT 1`,
+    [carrierCode, flightNumber, depDate]
+  );
+
+  if (subResult.rows.length === 0) {
+    return res.status(404).json({
+      error: `No active subscription found for ${carrierCode}${flightNumber} on ${depDate}`,
+      parsed: { carrierCode, flightNumber, depDate, state, delayMinutes },
+    });
+  }
+
+  const subscriptionId = subResult.rows[0].id;
+
+  const eventResult = await query(
+    `INSERT INTO flight_events (subscription_id, state, delay_minutes, raw_payload)
+     VALUES ($1, $2, $3, $4) RETURNING id`,
+    [subscriptionId, state, delayMinutes, JSON.stringify({ ...body, _simulated: true, _injectedBy: req.admin.username })]
+  );
+
+  const eventId = eventResult.rows[0].id;
+
+  const delayProcessor = require('../../services/delayProcessor');
+  const eventRow = (await query('SELECT * FROM flight_events WHERE id = $1', [eventId])).rows[0];
+  await delayProcessor.processEvent(eventRow);
+
+  return res.status(201).json({
+    ok: true,
+    eventId,
+    parsed: { carrierCode, flightNumber, depDate, state, delayMinutes, subscriptionId },
+    message: 'OAG payload mapped, event stored and processed',
+  });
 });
 
 // GET /api/admin/simulator/notifications — recent notifications for this tenant
