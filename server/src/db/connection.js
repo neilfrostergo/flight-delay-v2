@@ -1,7 +1,11 @@
 'use strict';
 
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const config = require('../config');
+
+// Return DATE columns as ISO strings (e.g. "2026-04-28") rather than Date objects.
+// Without this, String(dateCol).slice(0,10) gives "Mon Apr 28" not "2026-04-28".
+types.setTypeParser(1082, v => v);
 
 const pool = new Pool({
   connectionString: config.db.url,
