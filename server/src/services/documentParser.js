@@ -1,6 +1,11 @@
 'use strict';
 
-const fs = require('fs');
+const fs   = require('fs');
+const os   = require('os');
+const path = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 
 // Month name → number
 const MONTHS = {
@@ -65,26 +70,82 @@ function extractInfo(text) {
 }
 
 /**
+ * Render the first page of a PDF as a PNG using pdftoppm (from poppler-utils).
+ * Returns base64-encoded PNG string, or throws if unavailable.
+ */
+async function convertPdfFirstPageToImage(filePath) {
+  const prefix = path.join(os.tmpdir(), `pdfimg_${Date.now()}_${process.pid}`);
+  try {
+    // -r 150: 150 DPI — readable for AI vision without being too large
+    // -png: PNG output
+    // -l 1: only render first page
+    await execFileAsync('pdftoppm', ['-r', '150', '-png', '-l', '1', filePath, prefix]);
+    // Output filename varies by total page count; scan tmpdir for our prefix
+    const generated = fs.readdirSync(os.tmpdir())
+      .filter(f => f.startsWith(path.basename(prefix)) && f.endsWith('.png'));
+    if (generated.length === 0) throw new Error('pdftoppm produced no output');
+    const outPath = path.join(os.tmpdir(), generated[0]);
+    const buf = fs.readFileSync(outPath);
+    fs.unlinkSync(outPath);
+    return buf.toString('base64');
+  } catch (err) {
+    // Clean up any partial output
+    try {
+      fs.readdirSync(os.tmpdir())
+        .filter(f => f.startsWith(path.basename(prefix)) && f.endsWith('.png'))
+        .forEach(f => { try { fs.unlinkSync(path.join(os.tmpdir(), f)); } catch {} });
+    } catch {}
+    throw err;
+  }
+}
+
+/**
  * Parse a document file and extract flight/date hints.
  * Returns { parseMethod, flightNumbers, dates }.
+ *
+ * For PDFs, attempts to render the first page as an image (pdf_image) so the
+ * AI can use vision rather than relying on pdf-parse text extraction, which
+ * produces false positives from postcodes, insurance policy numbers, etc.
+ * Text extraction is still run in parallel as a regex fallback for the
+ * scan-document pre-fill flow (which has no AI).
  */
 async function parseDocument(filePath, mimeType) {
   if (mimeType === 'application/pdf') {
-    try {
-      // pdf-parse is an optional peer dep — fail gracefully if missing.
-      // IMPORTANT: pass a fresh Uint8Array, not a Buffer directly.
-      // Node.js Buffers can have a non-zero byteOffset into their underlying
-      // ArrayBuffer, which causes pdf.js's XRef offset arithmetic to be wrong.
-      const pdfParse = require('pdf-parse');
-      const buf  = fs.readFileSync(filePath);
-      const data = await pdfParse(new Uint8Array(buf));
-      const info = extractInfo(data.text || '');
-      console.log('[documentParser] PDF extracted flights:', info.flightNumbers, 'dates:', info.dates);
-      return { parseMethod: 'pdf', rawText: data.text || '', ...info };
-    } catch (err) {
-      console.warn('[documentParser] PDF parse error:', err.message);
+    // Attempt image rendering and text extraction in parallel
+    const [imgResult, txtResult] = await Promise.allSettled([
+      convertPdfFirstPageToImage(filePath),
+      (async () => {
+        const pdfParse = require('pdf-parse');
+        const buf  = fs.readFileSync(filePath);
+        const data = await pdfParse(new Uint8Array(buf));
+        return data.text || '';
+      })(),
+    ]);
+
+    const base64Image = imgResult.status === 'fulfilled' ? imgResult.value : null;
+    const rawText     = txtResult.status === 'fulfilled' ? txtResult.value : null;
+
+    if (imgResult.status === 'rejected') {
+      console.warn('[documentParser] PDF-to-image failed:', imgResult.reason?.message);
+    }
+    if (txtResult.status === 'rejected') {
+      console.warn('[documentParser] PDF text extraction failed:', txtResult.reason?.message);
+    }
+
+    if (!base64Image && !rawText) {
       return { parseMethod: 'pdf_error', flightNumbers: [], dates: [] };
     }
+
+    // Regex extraction on text (used by scan-document pre-fill; overridden by AI in upload flow)
+    const info = rawText ? extractInfo(rawText) : { flightNumbers: [], dates: [] };
+    console.log('[documentParser] PDF regex flights:', info.flightNumbers, 'dates:', info.dates);
+
+    if (base64Image) {
+      // pdf_image: AI vision is primary source; regex results included as fallback
+      return { parseMethod: 'pdf_image', base64Image, imageMime: 'image/png', rawText: rawText || '', ...info };
+    }
+    // Fallback: no image but we have text
+    return { parseMethod: 'pdf', rawText, ...info };
   }
 
   // JPEG/PNG — return image data for vision-based analysis in documentVerifier

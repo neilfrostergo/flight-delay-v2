@@ -398,6 +398,7 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
     // Done BEFORE regex matching so AI-extracted flight number can override regex noise.
     let aiResult = { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: null };
     const canVerify = (parsed.parseMethod === 'pdf' && parsed.rawText) ||
+                      (parsed.parseMethod === 'pdf_image') ||
                       (parsed.parseMethod === 'image' && parsed.base64Image);
     if (canVerify) {
       const targetFlight = allFlights.rows.find(f => f.id === flightId);

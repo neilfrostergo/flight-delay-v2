@@ -118,6 +118,7 @@ router.post('/:id/documents', upload.single('document'), async (req, res) => {
 
     // AI verification — run before matching so it can override regex noise
     const canVerify = (parsed.parseMethod === 'pdf' && parsed.rawText) ||
+                      (parsed.parseMethod === 'pdf_image') ||
                       (parsed.parseMethod === 'image' && parsed.base64Image);
     let aiResult = { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: null };
     if (canVerify) {

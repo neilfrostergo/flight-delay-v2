@@ -70,8 +70,9 @@ async function verifyDocument(parsed, registeredFlight) {
 
     let messages;
 
-    if (parsed.parseMethod === 'image') {
-      // Vision path — base64Image is set in local dev; in blob mode it's read here
+    if (parsed.parseMethod === 'image' || parsed.parseMethod === 'pdf_image') {
+      // Vision path — for pdf_image, base64Image is already the rendered PNG.
+      // For image uploads, base64Image is set in local dev; in blob mode it's read here.
       let base64Image = parsed.base64Image;
       if (!base64Image && parsed.blobKey) {
         const blobStorage = require('./blobStorage');
@@ -81,11 +82,14 @@ async function verifyDocument(parsed, registeredFlight) {
       if (!base64Image) {
         return { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: 'Image data unavailable' };
       }
+      // Use 'high' detail for PDF renders so small text (flight numbers, dates) is readable
+      const imageDetail = parsed.parseMethod === 'pdf_image' ? 'high' : 'low';
+      const imageMime   = parsed.imageMime || 'image/png';
       messages = [{
         role: 'user',
         content: [
           { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: `data:${parsed.imageMime};base64,${base64Image}`, detail: 'low' } },
+          { type: 'image_url', image_url: { url: `data:${imageMime};base64,${base64Image}`, detail: imageDetail } },
         ],
       }];
     } else if (parsed.rawText) {
@@ -98,8 +102,10 @@ async function verifyDocument(parsed, registeredFlight) {
       return { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: 'No content to verify' };
     }
 
-    // Use vision deployment for images, text deployment for PDFs
-    const model = (parsed.parseMethod === 'image') ? config.azureOpenAI.visionDeployment : config.azureOpenAI.deployment;
+    // Use vision deployment for images and PDF-rendered-as-image; text deployment for text PDFs
+    const model = (parsed.parseMethod === 'image' || parsed.parseMethod === 'pdf_image')
+      ? config.azureOpenAI.visionDeployment
+      : config.azureOpenAI.deployment;
 
     const response = await client.chat.completions.create({
       model,
