@@ -138,4 +138,4 @@ function matchFlights(parsed, registeredFlights) {
   return null;
 }
 
-module.exports = { parseDocument, matchFlights };
+module.exports = { parseDocument, matchFlights, normaliseFlight };
