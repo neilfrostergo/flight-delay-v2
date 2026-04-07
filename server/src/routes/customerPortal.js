@@ -134,7 +134,7 @@ router.post('/sessions', async (req, res) => {
   };
 
   // Re-validate if any key fields are missing (handles registrations created before these columns existed)
-  if (!policyDetail.policy_type || !policyDetail.policy_wording_url) {
+  if (!policyDetail.policy_type || !policyDetail.policy_wording_url || !policyDetail.geographic_area || !policyDetail.policy_issue_date) {
     const fresh = await validatePolicy(req.tenant, regDetailRow.policy_number, email.trim());
     if (fresh.valid) {
       policyDetail = {
