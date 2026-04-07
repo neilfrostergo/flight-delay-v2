@@ -93,6 +93,8 @@ router.post('/sessions', async (req, res) => {
         policy_type:      policyResult.policyType     || null,
         travelers:        policyResult.travelers       || null,
         cover_summary:    policyResult.coverSummary    || null,
+        geographic_area:  policyResult.geographicArea  || null,
+        policy_issue_date: policyResult.policyIssueDate || null,
         tenant_id:        req.tenant.id,
         type:             'customer',
       },
@@ -108,7 +110,8 @@ router.post('/sessions', async (req, res) => {
   const regDetail = await query(
     `SELECT policy_number, policy_type, travelers, cover_summary,
             policy_wording_url, policy_wording_name,
-            ipid_url, ipid_name, key_facts_url, key_facts_name
+            ipid_url, ipid_name, key_facts_url, key_facts_name,
+            geographic_area, policy_issue_date
      FROM registrations WHERE id = $1`,
     [registrationId]
   );
@@ -126,6 +129,8 @@ router.post('/sessions', async (req, res) => {
     ipid_name:            regDetailRow.ipid_name            || null,
     key_facts_url:        regDetailRow.key_facts_url        || null,
     key_facts_name:       regDetailRow.key_facts_name       || null,
+    geographic_area:      regDetailRow.geographic_area      || null,
+    policy_issue_date:    regDetailRow.policy_issue_date    || null,
   };
 
   // Re-validate if any key fields are missing (handles registrations created before these columns existed)
@@ -142,14 +147,17 @@ router.post('/sessions', async (req, res) => {
         ipid_name:            fresh.ipidName            || null,
         key_facts_url:        fresh.keyFactsUrl         || null,
         key_facts_name:       fresh.keyFactsName        || null,
+        geographic_area:      fresh.geographicArea      || policyDetail.geographic_area   || null,
+        policy_issue_date:    fresh.policyIssueDate     || policyDetail.policy_issue_date || null,
       };
       // Backfill so subsequent logins don't need to re-validate
       await query(
         `UPDATE registrations
             SET policy_type=$1, travelers=$2, cover_summary=$3,
                 policy_wording_url=$4, policy_wording_name=$5,
-                ipid_url=$6, ipid_name=$7, key_facts_url=$8, key_facts_name=$9
-          WHERE id=$10`,
+                ipid_url=$6, ipid_name=$7, key_facts_url=$8, key_facts_name=$9,
+                geographic_area=$10, policy_issue_date=$11
+          WHERE id=$12`,
         [
           policyDetail.policy_type,
           JSON.stringify(policyDetail.travelers),
@@ -157,6 +165,8 @@ router.post('/sessions', async (req, res) => {
           policyDetail.policy_wording_url,  policyDetail.policy_wording_name,
           policyDetail.ipid_url,            policyDetail.ipid_name,
           policyDetail.key_facts_url,       policyDetail.key_facts_name,
+          policyDetail.geographic_area,
+          policyDetail.policy_issue_date,
           registrationId,
         ]
       );
@@ -165,12 +175,14 @@ router.post('/sessions', async (req, res) => {
 
   const token = jwt.sign(
     {
-      sub:           registrationId,
-      tenant_id:     req.tenant.id,
-      type:          'customer',
-      policy_type:   policyDetail.policy_type,
-      travelers:     policyDetail.travelers,
-      cover_summary: policyDetail.cover_summary,
+      sub:               registrationId,
+      tenant_id:         req.tenant.id,
+      type:              'customer',
+      policy_type:       policyDetail.policy_type,
+      travelers:         policyDetail.travelers,
+      cover_summary:     policyDetail.cover_summary,
+      geographic_area:   policyDetail.geographic_area   || null,
+      policy_issue_date: policyDetail.policy_issue_date || null,
     },
     config.jwt.secret,
     { expiresIn: '24h' }
@@ -244,9 +256,11 @@ router.get('/registration', requireCustomer, async (req, res) => {
       payout_pence:     req.customer.payout_pence,
       cover_start_date: req.customer.cover_start_date || null,
       cover_end_date:   req.customer.cover_end_date   || null,
-      policy_type:      req.customer.policy_type      || null,
-      travelers:        req.customer.travelers         || null,
-      cover_summary:    req.customer.cover_summary     || null,
+      policy_type:       req.customer.policy_type       || null,
+      travelers:         req.customer.travelers          || null,
+      cover_summary:     req.customer.cover_summary      || null,
+      geographic_area:   req.customer.geographic_area    || null,
+      policy_issue_date: req.customer.policy_issue_date  || null,
       status:           'not_registered',
       flights:          [],
     });
@@ -257,7 +271,8 @@ router.get('/registration', requireCustomer, async (req, res) => {
             payout_pence, cover_start_date, cover_end_date, status, created_at,
             policy_type, travelers, cover_summary,
             policy_wording_url, policy_wording_name,
-            ipid_url, ipid_name, key_facts_url, key_facts_name
+            ipid_url, ipid_name, key_facts_url, key_facts_name,
+            geographic_area, policy_issue_date
      FROM registrations WHERE id = $1 AND tenant_id = $2`,
     [req.customer.sub, req.tenant.id]
   );

@@ -3052,6 +3052,21 @@ function renderPortalDash(reg) {
         <span class="p-label">Delay payout</span>
         <span class="p-value" style="color:var(--brand);font-size:16px;font-weight:800">${payoutPounds} <span style="font-size:12px;font-weight:400;color:var(--muted)">per person</span></span>
       </div>
+      ${state.tenant && state.tenant.minHoursBeforeDep ? `
+      <div class="p-row">
+        <span class="p-label">Delay threshold</span>
+        <span class="p-value">${state.tenant.minHoursBeforeDep} hours</span>
+      </div>` : ''}
+      ${reg.geographic_area ? `
+      <div class="p-row">
+        <span class="p-label">Destination</span>
+        <span class="p-value">${escHtml(reg.geographic_area)}</span>
+      </div>` : ''}
+      ${reg.policy_issue_date ? `
+      <div class="p-row">
+        <span class="p-label">Policy issued</span>
+        <span class="p-value">${fmtDate(reg.policy_issue_date)}</span>
+      </div>` : ''}
       ${docLinksHtml ? `
       <div class="p-row" style="align-items:center">
         <span class="p-label">Documents</span>

@@ -42,6 +42,8 @@ const registrationSchema = Joi.object({
   ipid_name:               Joi.string().max(200).allow(null, '').optional(),
   key_facts_url:           Joi.string().uri().allow(null, '').optional(),
   key_facts_name:          Joi.string().max(200).allow(null, '').optional(),
+  geographic_area:         Joi.string().max(200).allow(null, '').optional(),
+  policy_issue_date:       Joi.string().isoDate().allow(null).optional(),
 });
 
 // POST /api/registrations
@@ -103,8 +105,9 @@ router.post('/', async (req, res) => {
             pre_validation_token_id, ip_address, status,
             policy_type, travelers, cover_summary,
             policy_wording_url, policy_wording_name,
-            ipid_url, ipid_name, key_facts_url, key_facts_name)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::inet,'active',$13,$14,$15,$16,$17,$18,$19,$20,$21)
+            ipid_url, ipid_name, key_facts_url, key_facts_name,
+            geographic_area, policy_issue_date)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::inet,'active',$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
          ON CONFLICT (tenant_id, policy_number) DO NOTHING
          RETURNING id, policy_number, created_at`,
         [
@@ -129,6 +132,8 @@ router.post('/', async (req, res) => {
           value.ipid_name           || null,
           value.key_facts_url       || null,
           value.key_facts_name      || null,
+          value.geographic_area     || null,
+          value.policy_issue_date   || null,
         ]
       );
 

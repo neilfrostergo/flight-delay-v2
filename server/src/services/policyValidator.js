@@ -22,6 +22,8 @@ const DEMO_POLICIES = {
     payoutPence: 25000,
     coverStartDate: '2026-01-01',
     coverEndDate:   '2026-12-31',
+    geographicArea: 'Europe',
+    policyIssueDate: '2025-12-15',
   },
   // Single trip — LHR → MAD, two weeks away (relative to 2026-03-31)
   'POL-002-ACTIVE': {
@@ -31,6 +33,8 @@ const DEMO_POLICIES = {
     payoutPence: 25000,
     coverStartDate: '2026-04-10',
     coverEndDate:   '2026-04-17',
+    geographicArea: 'Europe',
+    policyIssueDate: '2026-03-01',
   },
   // Annual multi-trip — family, covers 2026–2027
   'POL-003-ACTIVE': {
@@ -44,6 +48,8 @@ const DEMO_POLICIES = {
     payoutPence: 20000,
     coverStartDate: '2026-02-01',
     coverEndDate:   '2027-01-31',
+    geographicArea: 'Worldwide',
+    policyIssueDate: '2026-01-20',
   },
   // Annual multi-trip — couple, covers 2026–2027
   'POL-004-ACTIVE': {
@@ -56,6 +62,8 @@ const DEMO_POLICIES = {
     payoutPence: 30000,
     coverStartDate: '2026-01-15',
     coverEndDate:   '2027-01-14',
+    geographicArea: 'Worldwide (exc. USA & Canada)',
+    policyIssueDate: '2026-01-10',
   },
   // Single trip — return trip, flying next month
   'POL-005-ACTIVE': {
@@ -68,6 +76,8 @@ const DEMO_POLICIES = {
     payoutPence: 15000,
     coverStartDate: '2026-05-01',
     coverEndDate:   '2026-05-14',
+    geographicArea: 'Europe',
+    policyIssueDate: '2026-04-01',
   },
 
   // ── Ergo demo accounts ────────────────────────────────────────────────────
@@ -81,6 +91,8 @@ const DEMO_POLICIES = {
     payoutPence: 30000,
     coverStartDate: '2026-01-01',
     coverEndDate:   '2026-12-31',
+    geographicArea: 'Europe',
+    policyIssueDate: '2025-12-20',
   },
   'ERGO-RET-2026-042': {
     firstName: 'Sophie', lastName: 'Klein',
@@ -89,6 +101,8 @@ const DEMO_POLICIES = {
     payoutPence: 25000,
     coverStartDate: '2026-05-01',
     coverEndDate:   '2026-05-21',
+    geographicArea: 'Europe',
+    policyIssueDate: '2026-04-05',
   },
   'ERGO-SGL-2026-117': {
     firstName: 'Lukas', lastName: 'Becker',
@@ -101,6 +115,8 @@ const DEMO_POLICIES = {
     payoutPence: 20000,
     coverStartDate: '2026-04-14',
     coverEndDate:   '2026-04-28',
+    geographicArea: 'Worldwide',
+    policyIssueDate: '2026-03-10',
   },
 
   // ── Staysure demo accounts ────────────────────────────────────────────────
@@ -114,6 +130,8 @@ const DEMO_POLICIES = {
     payoutPence: 25000,
     coverStartDate: '2026-01-01',
     coverEndDate:   '2026-12-31',
+    geographicArea: 'Europe',
+    policyIssueDate: '2025-12-18',
   },
   'SS-RET-2026-8820': {
     firstName: 'Margaret', lastName: 'Thornton',
@@ -125,6 +143,8 @@ const DEMO_POLICIES = {
     payoutPence: 30000,
     coverStartDate: '2026-06-01',
     coverEndDate:   '2026-06-15',
+    geographicArea: 'Worldwide (exc. USA & Canada)',
+    policyIssueDate: '2026-05-10',
   },
   'SS-SGL-2026-5504': {
     firstName: 'Dorothy', lastName: 'Pearson',
@@ -133,6 +153,8 @@ const DEMO_POLICIES = {
     payoutPence: 20000,
     coverStartDate: '2026-04-20',
     coverEndDate:   '2026-04-27',
+    geographicArea: 'Europe',
+    policyIssueDate: '2026-04-01',
   },
 };
 
@@ -181,6 +203,8 @@ function stubValidate(policyNumber, email) {
     coverStartDate: new Date().toISOString().slice(0, 10),
     coverEndDate:   new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     coverSummary:   buildCoverSummary(payoutGbp),
+    geographicArea: 'Europe',
+    policyIssueDate: null,
     rawResponse: { stub: true },
   };
 }
@@ -314,6 +338,8 @@ async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = fals
     coverStartDate: policy.startDate || null,
     coverEndDate:   policy.endDate   || null,
     coverSummary,
+    geographicArea: policy.geographicArea || policy.geographic_area || policy.area || null,
+    policyIssueDate: policy.issueDate || policy.inceptionDate || policy.issue_date || null,
     policyWordingUrl:  policy.policyWordingDocumentUrl || null,
     policyWordingName: 'Policy Wording',
     ipidUrl:           policy.ipidFileUrl || null,
