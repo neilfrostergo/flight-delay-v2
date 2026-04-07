@@ -413,7 +413,7 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
     }
 
     // AI authenticity verification — runs for PDF (text) and images (vision)
-    let aiResult = { genuine: null, confidence: null, passengerName: null, reason: null };
+    let aiResult = { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: null };
     const canVerify = (parsed.parseMethod === 'pdf' && parsed.rawText) ||
                       (parsed.parseMethod === 'image' && parsed.base64Image);
     if (canVerify) {
@@ -425,6 +425,16 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
         matchStatus     = 'matched';
         matchedFlightId = flightId;
         matchConfidence = aiResult.confidence;
+      } else if (aiResult.genuine === true && parsed.parseMethod === 'pdf' && matchStatus === 'no_match' && aiResult.flightNumber) {
+        // AI extracted a flight number from the PDF — try matching with it when regex failed
+        const { matchFlights: mf } = require('../services/documentParser');
+        const aiParsed = { flightNumbers: [aiResult.flightNumber], dates: aiResult.flightDate ? [aiResult.flightDate] : [] };
+        const aiMatchResult = mf(aiParsed, allFlights.rows);
+        if (aiMatchResult) {
+          matchStatus     = aiMatchResult.confidence === 'high' ? 'matched' : 'partial_match';
+          matchedFlightId = aiMatchResult.flightId;
+          matchConfidence = aiMatchResult.confidence;
+        }
       } else if (aiResult.genuine === false && aiResult.confidence === 'high') {
         // AI confident it's not genuine — reject regardless of regex match
         matchStatus = 'rejected';

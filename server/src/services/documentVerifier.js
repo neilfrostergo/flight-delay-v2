@@ -27,6 +27,8 @@ Respond with a JSON object (no markdown) with these fields:
 - genuine: true if this appears to be an authentic travel booking confirmation, e-ticket, or itinerary from a real travel company or airline; false if it appears fabricated, minimal, or suspicious
 - confidence: "high" or "medium"
 - passengerName: the full passenger name found in the document, or null if not found
+- flightNumber: the flight number (e.g. "AA135", "BA177") found in the document, or null if not found. This is the airline designator + number, NOT the booking reference.
+- flightDate: the departure date in YYYY-MM-DD format (e.g. "2026-04-28"), or null if not found
 - reason: one sentence explaining your assessment
 
 A genuine document will typically have: a booking reference, passenger name, airline/travel company branding or name, origin/destination airports, and flight number. Be suspicious of documents with only a flight number and date and nothing else.`;
@@ -54,7 +56,7 @@ async function getClient() {
  */
 async function verifyDocument(parsed, registeredFlight) {
   if (!isAvailable()) {
-    return { genuine: null, confidence: null, passengerName: null, reason: 'AI verification not configured' };
+    return { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: 'AI verification not configured' };
   }
 
   try {
@@ -77,7 +79,7 @@ async function verifyDocument(parsed, registeredFlight) {
         base64Image = buf.toString('base64');
       }
       if (!base64Image) {
-        return { genuine: null, confidence: null, passengerName: null, reason: 'Image data unavailable' };
+        return { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: 'Image data unavailable' };
       }
       messages = [{
         role: 'user',
@@ -93,7 +95,7 @@ async function verifyDocument(parsed, registeredFlight) {
         content: `${prompt}\n\nExtracted document text:\n---\n${parsed.rawText.slice(0, 4000)}\n---`,
       }];
     } else {
-      return { genuine: null, confidence: null, passengerName: null, reason: 'No content to verify' };
+      return { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: 'No content to verify' };
     }
 
     // Use vision deployment for images, text deployment for PDFs
@@ -113,19 +115,21 @@ async function verifyDocument(parsed, registeredFlight) {
       aiJson = JSON.parse(raw);
     } catch {
       console.warn('[documentVerifier] Could not parse AI response:', raw);
-      return { genuine: null, confidence: null, passengerName: null, reason: 'AI response parse error' };
+      return { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: 'AI response parse error' };
     }
 
     return {
       genuine:       Boolean(aiJson.genuine),
-      confidence:    aiJson.confidence || 'medium',
+      confidence:    aiJson.confidence  || 'medium',
       passengerName: aiJson.passengerName || null,
+      flightNumber:  aiJson.flightNumber  || null,
+      flightDate:    aiJson.flightDate    || null,
       reason:        aiJson.reason       || '',
     };
 
   } catch (err) {
     console.error('[documentVerifier] Azure OpenAI error:', err.message);
-    return { genuine: null, confidence: null, passengerName: null, reason: `AI error: ${err.message}` };
+    return { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: `AI error: ${err.message}` };
   }
 }
 
