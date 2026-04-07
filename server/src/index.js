@@ -83,9 +83,22 @@ app.use('/api/carriers', cors());
 app.use('/api/documents', cors());
 app.use('/api/customer', cors());
 
-// Admin API: restricted to configured origin
+// Admin API: accept any subdomain of the configured base domain, plus the exact adminOrigin fallback.
+// This means adding a new tenant never requires a config change.
+const adminCorsOrigin = (() => {
+  const baseDomain = process.env.BASE_DOMAIN; // e.g. delayedpaid.co.uk or uat.delayedpaid.co.uk
+  const exact = config.cors.adminOrigin;
+  if (!baseDomain) return exact;
+  const suffix = `.${baseDomain}`;
+  return (origin, cb) => {
+    if (!origin) return cb(null, false); // non-browser requests have no origin
+    if (origin === exact || origin.endsWith(suffix)) return cb(null, true);
+    cb(null, false);
+  };
+})();
+
 app.use('/api/admin', cors({
-  origin: config.cors.adminOrigin,
+  origin: adminCorsOrigin,
   credentials: true,
 }));
 
