@@ -17,9 +17,13 @@ const { triggerDeferredPayment }           = require('../services/delayProcessor
 const { verifyDocument }                   = require('../services/documentVerifier');
 const blob                                 = require('../services/blobStorage');
 
+const os = require('os');
 const router = express.Router();
 
-// ── Multer (same rules as documents.js) ───────────────────────────────────────
+// ── Multer ────────────────────────────────────────────────────────────────────
+// Use os.tmpdir() so uploads work in containers where the app directory is
+// read-only. Files are only written here briefly before blob upload and are
+// always cleaned up immediately after.
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', '..', 'server', 'uploads');
 
@@ -30,9 +34,9 @@ const ALLOWED_TYPES = {
 };
 
 const storage = multer.diskStorage({
-  destination(req, _file, cb) {
-    const dir = path.join(UPLOADS_DIR, String(req.customer.sub));
-    fs.mkdirSync(dir, { recursive: true });
+  destination(_req, _file, cb) {
+    const dir = blob.isAvailable() ? os.tmpdir() : UPLOADS_DIR;
+    if (!blob.isAvailable()) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename(_req, file, cb) {
