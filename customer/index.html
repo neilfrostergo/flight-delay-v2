@@ -1576,14 +1576,16 @@
 
         <div id="upload-list"></div>
 
-        <div class="upload-drop" id="upload-drop"
+        <label for="upload-input" class="btn btn-primary" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;cursor:pointer;font-size:14px;">
+          📎 Upload booking confirmation or e-ticket
+        </label>
+        <input type="file" id="upload-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none" onchange="handleFileInput(this)">
+        <div class="upload-drop" id="upload-drop" style="margin-top:10px"
              ondragover="event.preventDefault();this.classList.add('dragover')"
              ondragleave="this.classList.remove('dragover')"
              ondrop="handleDrop(event)">
-          <div class="upload-drop-icon">📎</div>
-          <div class="upload-drop-text">Drag a file here or <label for="upload-input" style="color:var(--brand);cursor:pointer;font-weight:600">browse</label></div>
-          <div class="upload-drop-hint">PDF, JPEG or PNG · max 10 MB per file</div>
-          <input type="file" id="upload-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none" onchange="handleFileInput(this)">
+          <div class="upload-drop-text" style="font-size:13px">or drag a file here</div>
+          <div class="upload-drop-hint">PDF, JPEG or PNG · max 10 MB</div>
         </div>
 
         <div id="upload-error" class="alert alert-error" style="display:none;margin-top:12px;"></div>
