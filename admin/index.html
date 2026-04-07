@@ -1136,6 +1136,7 @@ function normaliseColourHex(swatchId, hexId) {
 const state = {
   token: localStorage.getItem('admin_token') || null,
   me: null,
+  env: 'development',
   currentPage: null,
   regDetailId: null,
   settingsTenantId: null,
@@ -1281,16 +1282,17 @@ async function initApp() {
     if (res.data.total > 0) { badge.textContent = res.data.total; badge.style.display = ''; }
   }).catch(() => {});
 
-  // Show UAT banner if running in UAT environment
+  // Show UAT banner and store env for use elsewhere (e.g. simulator)
   try {
     const cfgRes = await fetch('/api/tenant-config');
     if (cfgRes.ok) {
       const cfg = await cfgRes.json();
+      state.env = cfg.env || 'development';
       if (cfg.env === 'uat') {
         document.getElementById('uat-banner').style.display = '';
       }
     }
-  } catch (_) {}
+  } catch (_) { state.env = 'development'; }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2316,8 +2318,7 @@ async function loadSimulator() {
   }
 
   // Show OAG payload tester only in non-production environments
-  const isProduction = state.tenant?.env === 'production' || (!state.tenant?.env && window.location.hostname !== 'localhost');
-  document.getElementById('oag-sim-card').style.display = isProduction ? 'none' : '';
+  document.getElementById('oag-sim-card').style.display = state.env === 'production' ? 'none' : '';
 
   // Load recent notifications
   loadSimNotifications();
