@@ -394,25 +394,8 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
     // Attach blob key so verifier can fetch image data if needed
     parsed.blobKey = blobKey;
 
-    const matchResult = matchFlights(parsed, allFlights.rows);
-
-    let matchStatus, matchedFlightId, matchConfidence;
-
-    if (parsed.parseMethod === 'image') {
-      matchStatus = 'pending_ai'; // AI will set to matched or rejected below
-    } else if (parsed.parseMethod === 'image_error' || parsed.parseMethod === 'unsupported') {
-      matchStatus = 'unreadable';
-    } else if (parsed.parseMethod === 'pdf_error') {
-      matchStatus = 'unreadable';
-    } else if (matchResult) {
-      matchStatus     = matchResult.confidence === 'high' ? 'matched' : 'partial_match';
-      matchedFlightId = matchResult.flightId;
-      matchConfidence = matchResult.confidence;
-    } else {
-      matchStatus = 'no_match';
-    }
-
-    // AI authenticity verification — runs for PDF (text) and images (vision)
+    // AI authenticity verification — runs for PDF (text) and images (vision).
+    // Done BEFORE regex matching so AI-extracted flight number can override regex noise.
     let aiResult = { genuine: null, confidence: null, passengerName: null, flightNumber: null, flightDate: null, reason: null };
     const canVerify = (parsed.parseMethod === 'pdf' && parsed.rawText) ||
                       (parsed.parseMethod === 'image' && parsed.base64Image);
@@ -420,26 +403,41 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
       const targetFlight = allFlights.rows.find(f => f.id === flightId);
       aiResult = await verifyDocument(parsed, targetFlight);
 
-      if (aiResult.genuine === true && parsed.parseMethod === 'image') {
+      // If AI extracted a specific flight number, use it as the canonical source —
+      // it correctly distinguishes flight numbers from booking references.
+      if (aiResult.flightNumber) {
+        parsed.flightNumbers = [aiResult.flightNumber];
+        if (aiResult.flightDate) parsed.dates = [aiResult.flightDate];
+      }
+    }
+
+    const matchResult = matchFlights(parsed, allFlights.rows);
+
+    let matchStatus, matchedFlightId, matchConfidence;
+
+    if (parsed.parseMethod === 'image') {
+      if (aiResult.genuine === true) {
         // Image verified as genuine by AI — treat as matched (regex can't read images)
         matchStatus     = 'matched';
         matchedFlightId = flightId;
         matchConfidence = aiResult.confidence;
-      } else if (aiResult.genuine === true && parsed.parseMethod === 'pdf' && matchStatus === 'no_match' && aiResult.flightNumber) {
-        // AI extracted a flight number from the PDF — try matching with it when regex failed
-        const { matchFlights: mf } = require('../services/documentParser');
-        const aiParsed = { flightNumbers: [aiResult.flightNumber], dates: aiResult.flightDate ? [aiResult.flightDate] : [] };
-        const aiMatchResult = mf(aiParsed, allFlights.rows);
-        if (aiMatchResult) {
-          matchStatus     = aiMatchResult.confidence === 'high' ? 'matched' : 'partial_match';
-          matchedFlightId = aiMatchResult.flightId;
-          matchConfidence = aiMatchResult.confidence;
-        }
-      } else if (aiResult.genuine === false && aiResult.confidence === 'high') {
-        // AI confident it's not genuine — reject regardless of regex match
-        matchStatus = 'rejected';
-        console.warn(`[customerPortal] AI rejected document for reg ${registrationId} flight ${flightId}: ${aiResult.reason}`);
+      } else {
+        matchStatus = 'pending_ai';
       }
+    } else if (parsed.parseMethod === 'image_error' || parsed.parseMethod === 'unsupported') {
+      matchStatus = 'unreadable';
+    } else if (parsed.parseMethod === 'pdf_error') {
+      matchStatus = 'unreadable';
+    } else if (aiResult.genuine === false && aiResult.confidence === 'high') {
+      // AI confident it's not genuine — reject regardless of regex match
+      matchStatus = 'rejected';
+      console.warn(`[customerPortal] AI rejected document for reg ${registrationId} flight ${flightId}: ${aiResult.reason}`);
+    } else if (matchResult) {
+      matchStatus     = matchResult.confidence === 'high' ? 'matched' : 'partial_match';
+      matchedFlightId = matchResult.flightId;
+      matchConfidence = matchResult.confidence;
+    } else {
+      matchStatus = 'no_match';
     }
 
     await query(
