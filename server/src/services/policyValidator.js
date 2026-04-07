@@ -265,16 +265,6 @@ async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = fals
     }
 
     body = await res.json();
-    const p = body.data?.[0] || {};
-    console.log('[policyValidator] POLICY TOP-LEVEL KEYS:', Object.keys(p));
-    console.log('[policyValidator] POLICY DATES/AREA:', JSON.stringify({
-      startDate: p.startDate, endDate: p.endDate,
-      issueDate: p.issueDate, inceptionDate: p.inceptionDate,
-      createdDate: p.createdDate, dateCreated: p.dateCreated,
-      geographicArea: p.geographicArea, area: p.area, destination: p.destination,
-      region: p.region, territory: p.territory,
-    }));
-    console.log('[policyValidator] SCHEME:', JSON.stringify(p.scheme, null, 2));
   } catch (err) {
     console.error('[policyValidator] Policy API request failed:', err.message);
     return { valid: false, errorMessage: 'Policy validation service unavailable' };
@@ -348,7 +338,7 @@ async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = fals
     coverStartDate: policy.startDate || null,
     coverEndDate:   policy.endDate   || null,
     coverSummary,
-    geographicArea: policy.geographicArea || policy.geographic_area || policy.area || null,
+    geographicArea: policy.destinationName || null,
     policyIssueDate: policy.issueDate || policy.inceptionDate || policy.issue_date || null,
     policyWordingUrl:  policy.policyWordingDocumentUrl || null,
     policyWordingName: 'Policy Wording',
