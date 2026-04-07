@@ -257,10 +257,11 @@ async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = fals
     return { valid: false, errorMessage: 'Policy is not active' };
   }
 
+  const leadClient = (policy.clients || []).find(c => c.relationshipId === 1) || policy.clients?.[0];
+
   // Email must match the lead client (case-insensitive) — skipped in token flow
   // where the token itself is the identity proof and the policy system may have placeholder emails.
   if (!skipEmailMatch) {
-    const leadClient = (policy.clients || []).find(c => c.relationshipId === 1) || policy.clients?.[0];
     if (!leadClient?.email || leadClient.email.toLowerCase() !== email.toLowerCase()) {
       return { valid: false, errorMessage: 'Email address does not match policy records' };
     }
