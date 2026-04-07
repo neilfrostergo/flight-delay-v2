@@ -24,14 +24,14 @@ Analyse the document provided by a customer to support a delay benefit claim.
 ${flightInfo}
 
 Respond with a JSON object (no markdown) with these fields:
-- genuine: true if this appears to be an authentic travel booking confirmation, e-ticket, or itinerary from a real travel company or airline; false if it appears fabricated, minimal, or suspicious
-- confidence: "high" or "medium"
-- passengerName: the full passenger name found in the document, or null if not found
-- flightNumber: the operating flight number shown next to a label like "Flight No.", "Flight", or "Flight Number" (e.g. "AA135", "BA177"). This is always an airline IATA code (2 letters) followed by digits. Do NOT return the booking reference — booking references are shown under labels like "Booking Reference", "Booking Ref", "Reference", "PNR" or "Confirmation Code" and often contain hyphens or non-airline letter combinations.
-- flightDate: the scheduled departure date of the flight in YYYY-MM-DD format (e.g. "2026-04-28"). Look for labels like "Date", "Departure Date", "Departs", or "Travel Date" within the flight details section. Do NOT return the date the booking was issued/created (shown under labels like "Issued", "Booked", "Issue Date", "Created").
-- reason: one sentence explaining your assessment
+- genuine: true if this document has the elements of a real booking confirmation or itinerary (passenger name, booking reference, travel dates, flight details, and an airline or travel company name). Return false ONLY if the document is clearly fabricated — for example, a plain text file containing nothing but a flight number and date with no other context. Do NOT return false simply because the travel company or airline is unfamiliar to you; lesser-known travel agencies and test bookings are acceptable.
+- confidence: "high" or "medium". Use "high" only when you are very confident.
+- passengerName: the full passenger name found in the document, or null if not present.
+- flightNumber: the operating flight number — an airline IATA code (2 letters) followed by digits, with no spaces (e.g. "VA015", "AA135", "BA177"). It may appear in several forms: "Flight: VA015", "Flight No: VA 015", "VA 015 operated by Virgin Atlantic", etc. Always strip any space between the carrier code and number. Do NOT return the booking reference — booking references appear under labels like "Booking Reference", "Booking Ref", "PNR", or "Confirmation Code" and typically contain hyphens or non-airline letter combinations (e.g. "HBT-K-32241", "ZNF0099").
+- flightDate: the scheduled departure date in YYYY-MM-DD format. Look for labels like "Departure Date", "Departs", "Travel Date", or "Date" within the flight itinerary section. Do NOT return the booking issue date (labels like "Issued", "Booked", "Issue Date", "Created", "Date of Issue").
+- reason: one sentence explaining your assessment.
 
-A genuine document will typically have: a booking reference, passenger name, airline/travel company branding or name, origin/destination airports, and flight number. Be suspicious of documents with only a flight number and date and nothing else.`;
+A genuine document typically has: a booking reference, passenger name, airline or travel company name, origin/destination airports or city names, departure date, and flight number.`;
 }
 
 async function getClient() {
