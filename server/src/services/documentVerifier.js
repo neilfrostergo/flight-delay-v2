@@ -96,8 +96,8 @@ async function verifyDocument(parsed, registeredFlight) {
       return { genuine: null, confidence: null, passengerName: null, reason: 'No content to verify' };
     }
 
-    // Use gpt-4o for vision (images), gpt-4o-mini for text
-    const model = (parsed.parseMethod === 'image') ? 'gpt4o-prd' : config.azureOpenAI.deployment;
+    // Use vision deployment for images, text deployment for PDFs
+    const model = (parsed.parseMethod === 'image') ? config.azureOpenAI.visionDeployment : config.azureOpenAI.deployment;
 
     const response = await client.chat.completions.create({
       model,

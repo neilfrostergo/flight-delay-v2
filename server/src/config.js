@@ -86,9 +86,10 @@ const config = {
   // Azure OpenAI — document verification via managed identity (UAT + production)
   // Leave blank in local development to skip AI verification.
   azureOpenAI: {
-    endpoint:    optionalEnv('AZURE_OPENAI_ENDPOINT', ''),
-    deployment:  optionalEnv('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini-prd'),
-    clientId:    optionalEnv('AZURE_CLIENT_ID', ''),
+    endpoint:           optionalEnv('AZURE_OPENAI_ENDPOINT', ''),
+    deployment:         optionalEnv('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini-prd'),
+    visionDeployment:   optionalEnv('AZURE_OPENAI_VISION_DEPLOYMENT', 'gpt4o-prd'),
+    clientId:           optionalEnv('AZURE_CLIENT_ID', ''),
   },
 
   // Azure Event Hub — production only (ignored in development)
