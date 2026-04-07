@@ -34,19 +34,24 @@ async function uploadFile(localPath, blobName, mimeType) {
     return null;
   }
 
-  const client        = getBlobServiceClient();
-  const containerClient = client.getContainerClient(config.blobStorage.container);
-  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+  try {
+    const client          = getBlobServiceClient();
+    const containerClient = client.getContainerClient(config.blobStorage.container);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
-  const buffer = fs.readFileSync(localPath);
-  await blockBlobClient.uploadData(buffer, {
-    blobHTTPHeaders: { blobContentType: mimeType },
-  });
+    const buffer = fs.readFileSync(localPath);
+    await blockBlobClient.uploadData(buffer, {
+      blobHTTPHeaders: { blobContentType: mimeType },
+    });
 
-  // Delete local temp file after successful upload
-  fs.unlink(localPath, () => {});
+    // Delete local temp file after successful upload
+    fs.unlink(localPath, () => {});
 
-  return blockBlobClient.url;
+    return blockBlobClient.url;
+  } catch (err) {
+    console.error('[blobStorage] uploadFile failed:', err.message);
+    throw err; // re-throw so callers can return a proper error response
+  }
 }
 
 /**

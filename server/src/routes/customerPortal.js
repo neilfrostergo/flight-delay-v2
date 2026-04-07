@@ -350,10 +350,18 @@ router.post('/flights/:flightId/documents', requireCustomer, upload.single('docu
   const doc = docResult.rows[0];
 
   // ── Upload to blob storage (replaces local file in UAT/prod) ──────────────
-  const blobKey  = blob.blobName(registrationId, req.file.filename);
-  const blobUrl  = await blob.uploadFile(req.file.path, blobKey, req.file.mimetype);
-  if (blobUrl) {
-    await query(`UPDATE registration_documents SET blob_url = $1 WHERE id = $2`, [blobUrl, doc.id]);
+  const blobKey = blob.blobName(registrationId, req.file.filename);
+  let blobUrl;
+  try {
+    blobUrl = await blob.uploadFile(req.file.path, blobKey, req.file.mimetype);
+    if (blobUrl) {
+      await query(`UPDATE registration_documents SET blob_url = $1 WHERE id = $2`, [blobUrl, doc.id]);
+    }
+  } catch (blobErr) {
+    // Clean up the local temp file and return a clear error to the client
+    fs.unlink(req.file.path, () => {});
+    await query('DELETE FROM registration_documents WHERE id = $1', [doc.id]);
+    return res.status(500).json({ error: 'Document storage unavailable — please try again shortly' });
   }
   // If blob upload succeeded, req.file.path is deleted. parseDocument will
   // read from blob; if not available (local dev), local path still exists.

@@ -3330,14 +3330,15 @@ async function portalUploadFile(flightId, input) {
       headers: { 'Authorization': 'Bearer ' + portalState.token, ...tenantHeader() },
       body: formData,
     });
-    const data = await res.json();
     const tempEl = document.getElementById(tempId);
 
     if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
       if (tempEl) tempEl.remove();
       errEl.textContent = data.error || 'Upload failed — please try again.';
       errEl.style.display = 'block'; return;
     }
+    const data = await res.json();
 
     const parsedInfo = data.parsed_flight_numbers && data.parsed_flight_numbers.length
       ? `<div class="portal-doc-parsed">Found in document: ${data.parsed_flight_numbers.map(escHtml).join(', ')} · dates: ${(data.parsed_dates || []).join(', ') || '—'}</div>`
