@@ -20,10 +20,12 @@ function extractInfo(text) {
   const upper = text.toUpperCase();
 
   // Flight numbers: 2–3 letter IATA carrier code followed by 2–4 digits.
-  // Minimum 2 digits eliminates UK postcode area codes (CM1, BN2, W1 etc.).
+  // Minimum 2 digits eliminates single-digit postcode areas (CM1, BN2 etc.).
+  // (?![A-Z]) rejects matches immediately followed by a letter, which kills
+  // postcode variants like SW1A or EC2A where a digit precedes the sector letter.
   // Allow up to 3 whitespace/dash chars to handle PDFs with extra spaces.
   const flightNums = new Set();
-  const reF = /\b([A-Z]{2,3})[\s\-]{0,3}(\d{2,4})\b/g;
+  const reF = /\b([A-Z]{2,3})[\s\-]{0,3}(\d{2,4})(?![A-Z])/g;
   let m;
   while ((m = reF.exec(upper)) !== null) {
     flightNums.add(`${m[1]}${m[2]}`);
