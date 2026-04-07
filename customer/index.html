@@ -1202,20 +1202,24 @@
 
     .scan-shortcut { margin-bottom: 14px; }
     .scan-shortcut-label {
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border: 1.5px dashed var(--border);
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--brand);
+      color: #fff;
+      border: none;
       border-radius: var(--radius-sm);
-      font-size: 13px;
-      color: var(--brand);
+      font-size: 14px;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
+      transition: opacity 0.15s;
       width: 100%;
       box-sizing: border-box;
     }
-    .scan-shortcut-label:hover { background: var(--brand-light); border-color: var(--brand); }
+    .scan-shortcut-label:hover { opacity: 0.88; }
+    .scan-shortcut-hint { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }
     #step2-scan-status, #portal-scan-status {
       margin-top: 6px;
       font-size: 13px;
@@ -1421,8 +1425,9 @@
       <!-- Document scan shortcut -->
       <div class="scan-shortcut">
         <label class="scan-shortcut-label" for="step2-scan-input">
-          📄 Upload booking confirmation or itinerary to find your flight automatically
+          📄 Upload confirmation to find your flight automatically
         </label>
+        <div class="scan-shortcut-hint">We'll read your booking confirmation or itinerary and fill in the details for you</div>
         <input type="file" id="step2-scan-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none"
                onchange="step2ScanDocument(this)">
         <div id="step2-scan-status" style="display:none"></div>
@@ -1661,8 +1666,9 @@
             <!-- Scan option -->
             <div class="scan-shortcut" style="margin-bottom:14px">
               <label class="scan-shortcut-label" for="portal-scan-input">
-                📄 Upload booking confirmation or itinerary to find your flight
+                📄 Upload confirmation to find your flight automatically
               </label>
+              <div class="scan-shortcut-hint">We'll read your booking confirmation or itinerary and fill in the details for you</div>
               <input type="file" id="portal-scan-input" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style="display:none"
                      onchange="portalScanDocument(this)">
               <div id="portal-scan-status" style="display:none"></div>
