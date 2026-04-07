@@ -30,9 +30,9 @@ const config                             = require('../config');
 
 function buildUploadUrl(token, tenant) {
   const host = `${tenant.slug}.${config.baseDomain}`;
-  const base = config.isProduction
-    ? `https://${host}`
-    : `http://${host}:${config.port}`;
+  const base = config.isLocalDev
+    ? `http://${host}:${config.port}`
+    : `https://${host}`;
   return `${base}?upload_token=${token}`;
 }
 

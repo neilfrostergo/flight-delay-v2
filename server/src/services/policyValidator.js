@@ -345,8 +345,7 @@ async function liveValidate(tenant, policyNumber, email, { skipEmailMatch = fals
  * }>}
  */
 async function validatePolicy(tenant, policyNumber, email, options = {}) {
-  const env = process.env.NODE_ENV;
-  if (tenant.policy_api_mode === 'live' && env !== 'uat' && env !== 'development') {
+  if (tenant.policy_api_mode === 'live') {
     return liveValidate(tenant, policyNumber, email, options);
   }
   return stubValidate(policyNumber, email);

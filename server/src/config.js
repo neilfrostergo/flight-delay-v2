@@ -31,6 +31,9 @@ const config = {
   nodeEnv: optionalEnv('NODE_ENV', 'development'),
   port: parseInt(optionalEnv('PORT', '3000'), 10),
   isProduction: optionalEnv('NODE_ENV', 'development') === 'production',
+  // isLocalDev: true only in local development — use http + port in URLs.
+  // UAT and production both use https + no port.
+  isLocalDev: optionalEnv('NODE_ENV', 'development') === 'development',
 
   db: {
     url: requireEnv('DATABASE_URL'),

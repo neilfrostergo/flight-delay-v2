@@ -16,7 +16,7 @@ const config     = require('../config');
 function tenantPortalUrl(tenant) {
   if (!tenant?.slug) return null;
   const host = `${tenant.slug}.${config.baseDomain}`;
-  if (config.isProduction) return `https://${host}`;
+  if (!config.isLocalDev) return `https://${host}`;
   return `http://${host}:${config.port}`;
 }
 
