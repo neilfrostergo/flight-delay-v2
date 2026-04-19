@@ -14,6 +14,7 @@ const resolveTenant = require('./middleware/resolveTenant');
 const requestLogger = require('./middleware/requestLogger');
 const { registrationLimiter, loginLimiter, validateLimiter } = require('./middleware/rateLimiter');
 const requireAdmin = require('./middleware/requireAdmin');
+const siteAuth = require('./middleware/siteAuth');
 
 // Routes — public
 const tenantConfigRouter = require('./routes/tenantConfig');
@@ -52,6 +53,9 @@ app.set('trust proxy', 1);
 
 // Health check — used by Front Door and Container Apps liveness probes
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// ── Site-wide Basic Auth (UAT gate) ──────────────────────────────────────────
+app.use(siteAuth);
 
 // ── Security headers ────────────────────────────────────────────────────────
 app.use(helmet({
